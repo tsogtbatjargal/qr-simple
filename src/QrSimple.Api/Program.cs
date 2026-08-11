@@ -58,6 +58,17 @@ app.MapPost("/equipment", async (CreateEquipmentRequest request, AppDbContext db
     return Results.Created($"/equipment/{equipment.Id}", equipment);
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
+app.MapGet("/equipment", async (bool? includeRetired, AppDbContext db) =>
+{
+    var query = db.Equipment.AsQueryable();
+    if (includeRetired != true)
+    {
+        query = query.Where(e => e.Status == "Active");
+    }
+
+    return Results.Ok(await query.ToListAsync());
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator", "Reader"));
+
 app.MapGet("/equipment/{id}/qr", async (Guid id, AppDbContext db, IConfiguration config) =>
 {
     var equipment = await db.Equipment.FindAsync(id);

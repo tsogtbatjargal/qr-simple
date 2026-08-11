@@ -1,0 +1,49 @@
+{
+  "name": "qr-simple",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:1-10.0",
+  "remoteUser": "vscode",
+  // Mounts the host's rootless podman socket so Testcontainers (run from
+  // inside this container) talks straight to the host's podman -- no nested
+  // container runtime. Path assumes host UID 1000 (this machine's tsogtb
+  // user); adjust if `id -u` differs.
+  //
+  // --userns=keep-id: without it, rootless podman remaps host UID 1000 to a
+  // different UID inside the container's user namespace, so the vscode user
+  // (UID 1000 in-container) no longer matches the socket's actual owner and
+  // gets permission-denied on connect (verified: `ls` on the socket succeeds
+  // either way -- stat doesn't need matching perms -- but an actual API call
+  // over it fails until UIDs truly line up).
+  // security-opt label=disable: an SELinux relabel on this bind mount (the
+  // default behavior of Podman/Docker's ":Z" mount suffix) breaks the HOST's
+  // own access to the socket, not just the container's -- verified by
+  // reproducing the failure with a plain `podman run -v ...:Z` and fixing it
+  // by disabling label confinement for this specific mount instead.
+  // --network=host: Testcontainers, run from inside this container, creates
+  // its Postgres container as a SIBLING (via the mounted host socket), not a
+  // child -- they don't share a network namespace by default. Rootless
+  // podman also only publishes sibling ports on the HOST's loopback, not to
+  // other containers. Sharing the host's network namespace here is what
+  // makes "localhost:<published-port>" resolve to the right place. Verified:
+  // omitting this reproduces exactly Npgsql "connection refused" even though
+  // the sibling Postgres container starts successfully.
+  "runArgs": ["--userns=keep-id", "--security-opt", "label=disable", "--network=host"],
+  "mounts": [
+    "source=/run/user/1000/podman/podman.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "containerEnv": {
+    "DOCKER_HOST": "unix:///var/run/docker.sock",
+    "TESTCONTAINERS_RYUK_DISABLED": "true"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-dotnettools.csdevkit", "ms-dotnettools.csharp"]
+    }
+  },
+  // libfontconfig1 is missing from this base image; SkiaSharp needs it even
+  // just to render a QR code, not only for text. Without it every QrCode /
+  // ScanPage test aborts the whole run (native crash during GC finalization,
+  // not a clean test failure). `apt-get update` exits 100 here regardless,
+  // because the image ships an unrelated unsigned yarn.pkg apt source -- that
+  // failure is harmless and expected; don't let it short-circuit the install.
+  "postCreateCommand": "sudo apt-get update -qq; sudo apt-get install -y -qq libfontconfig1 && dotnet restore"
+}

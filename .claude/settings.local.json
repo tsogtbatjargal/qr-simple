@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh api *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(gh label *)",
+      "Bash(gh issue *)",
+      "Bash(dotnet --version)",
+      "Bash(docker --version)",
+      "Bash(docker info *)",
+      "Bash(command -v snap flatpak dnf rpm-ostree)",
+      "Read(//usr/lib/**)",
+      "Bash(curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/claude-1000/-var-home-tsogtb-git-projects-qr-simple/96bd3a31-d1a3-422f-84aa-a524edd704d3/scratchpad/dotnet-install.sh)",
+      "Bash(chmod +x /tmp/claude-1000/-var-home-tsogtb-git-projects-qr-simple/96bd3a31-d1a3-422f-84aa-a524edd704d3/scratchpad/dotnet-install.sh)",
+      "Bash(/tmp/claude-1000/-var-home-tsogtb-git-projects-qr-simple/96bd3a31-d1a3-422f-84aa-a524edd704d3/scratchpad/dotnet-install.sh --channel LTS --install-dir /var/home/tsogtb/.dotnet)",
+      "Bash(git push *)",
+      "Bash(bash -n /var/home/tsogtb/git-projects/qr-simple/scripts/setup-google-oauth.sh)",
+      "Bash(chmod +x /var/home/tsogtb/git-projects/qr-simple/scripts/setup-google-oauth.sh)",
+      "Bash(command -v shellcheck)",
+      "Bash(shellcheck /var/home/tsogtb/git-projects/qr-simple/scripts/setup-google-oauth.sh)"
+    ]
+  }
+}

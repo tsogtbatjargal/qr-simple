@@ -10,7 +10,8 @@ ASP.NET Core minimal API (`src/QrSimple.Api`) + PostgreSQL via EF Core, tested a
 
 `Program.cs` is a thin HTTP adapter — routes translate requests into calls on these modules and translate results back into responses. It should stay thin; if you find yourself adding a validation rule or business decision directly inside a route lambda, that logic belongs in one of the modules below instead:
 
-- **`EquipmentCatalog`** — single-Equipment lifecycle (create, update, retire, reactivate). Owns category validation. Returns an `EquipmentResult` (`Success` / `NotFound` / `UnknownCategory`) that `Program.cs` pattern-matches into an HTTP response.
+- **`EquipmentCatalog`** — single-Equipment lifecycle (create, update, retire, reactivate). Owns category validation. Returns an `EquipmentResult` (`Success` / `NotFound` / `UnknownCategory`); call `.ToHttpResult(onSuccess)` to turn it into a response — don't hand-write a new `switch` per route, `NotFound`/`UnknownCategory` already map correctly for every case.
+- **`Equipment.Create(...)`** — the one place that constructs a new Equipment (`Id = Guid.NewGuid()` + field mapping). Both `EquipmentCatalog` and `EquipmentImport` call it — add a new required field once, here, not at every construction site.
 - **`EquipmentImport`** — bulk CSV import: parsing, duplicate skip+report, update-existing upsert mode.
 - **`RequireRoleFilter`** — an `IEndpointFilter` gating write endpoints by role. Applied per-route via `.AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"))`.
 - **`QrCode`** / **`ScanPage`** — QR PNG generation and the public scan-page HTML, respectively.

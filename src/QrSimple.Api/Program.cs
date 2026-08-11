@@ -42,13 +42,7 @@ app.UseAuthorization();
 app.MapPost("/equipment", async (CreateEquipmentRequest request, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.CreateAsync(request, db);
-    IResult response = result switch
-    {
-        EquipmentResult.Success s => Results.Created($"/equipment/{s.Equipment.Id}", s.Equipment),
-        EquipmentResult.UnknownCategory u => Results.BadRequest($"Unknown category: {u.Category}"),
-        _ => Results.Problem(),
-    };
-    return response;
+    return result.ToHttpResult(equipment => Results.Created($"/equipment/{equipment.Id}", equipment));
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapGet("/equipment", async (bool? includeRetired, AppDbContext db) =>
@@ -114,38 +108,19 @@ app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest requ
 app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.UpdateAsync(id, request, db);
-    IResult response = result switch
-    {
-        EquipmentResult.Success s => Results.Ok(s.Equipment),
-        EquipmentResult.NotFound => Results.NotFound(),
-        EquipmentResult.UnknownCategory u => Results.BadRequest($"Unknown category: {u.Category}"),
-        _ => Results.Problem(),
-    };
-    return response;
+    return result.ToHttpResult(Results.Ok);
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.RetireAsync(id, db);
-    IResult response = result switch
-    {
-        EquipmentResult.Success s => Results.Ok(s.Equipment),
-        EquipmentResult.NotFound => Results.NotFound(),
-        _ => Results.Problem(),
-    };
-    return response;
+    return result.ToHttpResult(Results.Ok);
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/equipment/{id}/reactivate", async (Guid id, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.ReactivateAsync(id, db);
-    IResult response = result switch
-    {
-        EquipmentResult.Success s => Results.Ok(s.Equipment),
-        EquipmentResult.NotFound => Results.NotFound(),
-        _ => Results.Problem(),
-    };
-    return response;
+    return result.ToHttpResult(Results.Ok);
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =>

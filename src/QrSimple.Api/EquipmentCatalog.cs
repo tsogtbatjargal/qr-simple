@@ -9,6 +9,15 @@ public abstract record EquipmentResult
     public sealed record NotFound : EquipmentResult;
 
     public sealed record UnknownCategory(string Category) : EquipmentResult;
+
+    // Success shape (Created vs Ok) varies per endpoint; NotFound/UnknownCategory don't, so they're mapped once here.
+    public IResult ToHttpResult(Func<Equipment, IResult> onSuccess) => this switch
+    {
+        Success s => onSuccess(s.Equipment),
+        NotFound => Results.NotFound(),
+        UnknownCategory u => Results.BadRequest($"Unknown category: {u.Category}"),
+        _ => Results.Problem(),
+    };
 }
 
 public static class EquipmentCatalog
@@ -20,14 +29,7 @@ public static class EquipmentCatalog
             return new EquipmentResult.UnknownCategory(request.Category);
         }
 
-        var equipment = new Equipment
-        {
-            Id = Guid.NewGuid(),
-            Name = request.Name,
-            Category = request.Category,
-            SerialNumber = request.SerialNumber,
-            Site = request.Site,
-        };
+        var equipment = Equipment.Create(request.Name, request.Category, request.SerialNumber, request.Site);
 
         db.Equipment.Add(equipment);
         await db.SaveChangesAsync();

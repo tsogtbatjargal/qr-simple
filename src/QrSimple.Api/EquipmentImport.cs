@@ -59,14 +59,7 @@ public static class EquipmentImport
                 continue;
             }
 
-            var equipment = new Equipment
-            {
-                Id = Guid.NewGuid(),
-                Name = row.Name,
-                Category = row.Category,
-                SerialNumber = row.SerialNumber,
-                Site = row.Site,
-            };
+            var equipment = Equipment.Create(row.Name, row.Category, row.SerialNumber, row.Site);
 
             db.Equipment.Add(equipment);
             createdSerialNumbers.Add(row.SerialNumber);

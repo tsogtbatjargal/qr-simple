@@ -101,6 +101,15 @@ app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
     return Results.Ok(equipment);
 });
 
+app.MapPost("/equipment/import", async (IFormFile file, AppDbContext db, HttpRequest request) =>
+{
+    var updateExisting = bool.TryParse(request.Form["updateExisting"], out var parsed) && parsed;
+
+    await using var stream = file.OpenReadStream();
+    var result = await EquipmentImport.RunAsync(stream, db, updateExisting);
+    return Results.Ok(result);
+}).DisableAntiforgery();
+
 app.Run();
 
 record CreateEquipmentRequest(string Name, string Category, string SerialNumber, string Site);

@@ -2,6 +2,16 @@
   "name": "qr-simple",
   "image": "mcr.microsoft.com/devcontainers/dotnet:1-10.0",
   "remoteUser": "vscode",
+  // The CLI's own UID-matching step (which rebuilds the image via a
+  // generated Dockerfile in ITS OWN /tmp) doesn't work through the
+  // flatpak-spawn --host bridge: that Dockerfile lives in the Flatpak
+  // sandbox's private /tmp, invisible to the real host process that
+  // podman-for-vscode.sh actually execs into, so "docker build -f
+  // <path>" fails with "no such file or directory" even though the file
+  // is right there from the sandbox's own point of view. We don't need
+  // this anyway -- --userns=keep-id below already makes the container's
+  // vscode user (UID 1000) match the host UID correctly.
+  "updateRemoteUserUID": false,
   // Mounts the host's rootless podman socket so Testcontainers (run from
   // inside this container) talks straight to the host's podman -- no nested
   // container runtime. Path assumes host UID 1000 (this machine's tsogtb

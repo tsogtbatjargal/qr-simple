@@ -79,5 +79,29 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Contains("https://docs.example.com/ex-0004-manual.pdf", html);
     }
 
+    [Fact]
+    public async Task Reactivated_equipment_no_longer_shows_retired_indicator()
+    {
+        var client = factory.CreateClient();
+
+        var createResponse = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Reactivated Pump",
+            category = "Pump",
+            serialNumber = "PM-0100",
+            site = "East Pit",
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        await client.PostAsync($"/equipment/{created!.Id}/retire", content: null);
+        var reactivateResponse = await client.PostAsync($"/equipment/{created.Id}/reactivate", content: null);
+        Assert.True(reactivateResponse.IsSuccessStatusCode);
+
+        var scanResponse = await client.GetAsync($"/e/{created.Id}");
+        var html = await scanResponse.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("no longer in service", html, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed record CreatedEquipment(Guid Id);
 }

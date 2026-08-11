@@ -87,6 +87,23 @@ app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest requ
     return Results.Created($"/equipment/{id}/documents/{document.Id}", document);
 });
 
+app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, AppDbContext db) =>
+{
+    var equipment = await db.Equipment.FindAsync(id);
+    if (equipment is null)
+    {
+        return Results.NotFound();
+    }
+
+    equipment.Name = request.Name;
+    equipment.Category = request.Category;
+    equipment.SerialNumber = request.SerialNumber;
+    equipment.Site = request.Site;
+    await db.SaveChangesAsync();
+
+    return Results.Ok(equipment);
+});
+
 app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
 {
     var equipment = await db.Equipment.FindAsync(id);
@@ -96,6 +113,20 @@ app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
     }
 
     equipment.Status = "Retired";
+    await db.SaveChangesAsync();
+
+    return Results.Ok(equipment);
+});
+
+app.MapPost("/equipment/{id}/reactivate", async (Guid id, AppDbContext db) =>
+{
+    var equipment = await db.Equipment.FindAsync(id);
+    if (equipment is null)
+    {
+        return Results.NotFound();
+    }
+
+    equipment.Status = "Active";
     await db.SaveChangesAsync();
 
     return Results.Ok(equipment);

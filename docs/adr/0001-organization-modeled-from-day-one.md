@@ -1,0 +1,3 @@
+# Model Organization as a first-class entity from v1, despite single-tenant use
+
+v1 serves exactly one mining company, so a flat single-tenant schema would be the simpler starting point. We chose to model Organization as a real entity (with every Equipment and User referencing one) anyway, with a single hardcoded row in v1, because the stated goal is to sell this to other companies if it succeeds — and some of those companies want to bring their own document storage. Backfilling an `OrganizationId` across live Equipment/User tables and every query later is a much more expensive migration than carrying an unused-but-correct foreign key from the start. The UI and business logic remain single-tenant-simple for v1; only the data model anticipates growth.

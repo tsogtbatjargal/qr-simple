@@ -8,4 +8,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<User> Users => Set<User>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Equipment>()
+            .Property(e => e.Status)
+            .HasConversion<string>();
+    }
 }

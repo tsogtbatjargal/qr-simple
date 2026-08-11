@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie()
@@ -38,24 +41,14 @@ app.UseAuthorization();
 
 app.MapPost("/equipment", async (CreateEquipmentRequest request, AppDbContext db) =>
 {
-    if (!await db.Categories.AnyAsync(c => c.Name == request.Category))
+    var result = await EquipmentCatalog.CreateAsync(request, db);
+    IResult response = result switch
     {
-        return Results.BadRequest($"Unknown category: {request.Category}");
-    }
-
-    var equipment = new Equipment
-    {
-        Id = Guid.NewGuid(),
-        Name = request.Name,
-        Category = request.Category,
-        SerialNumber = request.SerialNumber,
-        Site = request.Site,
+        EquipmentResult.Success s => Results.Created($"/equipment/{s.Equipment.Id}", s.Equipment),
+        EquipmentResult.UnknownCategory u => Results.BadRequest($"Unknown category: {u.Category}"),
+        _ => Results.Problem(),
     };
-
-    db.Equipment.Add(equipment);
-    await db.SaveChangesAsync();
-
-    return Results.Created($"/equipment/{equipment.Id}", equipment);
+    return response;
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapGet("/equipment", async (bool? includeRetired, AppDbContext db) =>
@@ -63,7 +56,7 @@ app.MapGet("/equipment", async (bool? includeRetired, AppDbContext db) =>
     var query = db.Equipment.AsQueryable();
     if (includeRetired != true)
     {
-        query = query.Where(e => e.Status == "Active");
+        query = query.Where(e => e.Status == EquipmentStatus.Active);
     }
 
     return Results.Ok(await query.ToListAsync());
@@ -120,52 +113,39 @@ app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest requ
 
 app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, AppDbContext db) =>
 {
-    var equipment = await db.Equipment.FindAsync(id);
-    if (equipment is null)
+    var result = await EquipmentCatalog.UpdateAsync(id, request, db);
+    IResult response = result switch
     {
-        return Results.NotFound();
-    }
-
-    if (!await db.Categories.AnyAsync(c => c.Name == request.Category))
-    {
-        return Results.BadRequest($"Unknown category: {request.Category}");
-    }
-
-    equipment.Name = request.Name;
-    equipment.Category = request.Category;
-    equipment.SerialNumber = request.SerialNumber;
-    equipment.Site = request.Site;
-    await db.SaveChangesAsync();
-
-    return Results.Ok(equipment);
+        EquipmentResult.Success s => Results.Ok(s.Equipment),
+        EquipmentResult.NotFound => Results.NotFound(),
+        EquipmentResult.UnknownCategory u => Results.BadRequest($"Unknown category: {u.Category}"),
+        _ => Results.Problem(),
+    };
+    return response;
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
 {
-    var equipment = await db.Equipment.FindAsync(id);
-    if (equipment is null)
+    var result = await EquipmentCatalog.RetireAsync(id, db);
+    IResult response = result switch
     {
-        return Results.NotFound();
-    }
-
-    equipment.Status = "Retired";
-    await db.SaveChangesAsync();
-
-    return Results.Ok(equipment);
+        EquipmentResult.Success s => Results.Ok(s.Equipment),
+        EquipmentResult.NotFound => Results.NotFound(),
+        _ => Results.Problem(),
+    };
+    return response;
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/equipment/{id}/reactivate", async (Guid id, AppDbContext db) =>
 {
-    var equipment = await db.Equipment.FindAsync(id);
-    if (equipment is null)
+    var result = await EquipmentCatalog.ReactivateAsync(id, db);
+    IResult response = result switch
     {
-        return Results.NotFound();
-    }
-
-    equipment.Status = "Active";
-    await db.SaveChangesAsync();
-
-    return Results.Ok(equipment);
+        EquipmentResult.Success s => Results.Ok(s.Equipment),
+        EquipmentResult.NotFound => Results.NotFound(),
+        _ => Results.Problem(),
+    };
+    return response;
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =>
@@ -218,7 +198,7 @@ app.MapPost("/equipment/import", async (IFormFile file, AppDbContext db, HttpReq
 
 app.Run();
 
-record CreateEquipmentRequest(string Name, string Category, string SerialNumber, string Site);
+public record CreateEquipmentRequest(string Name, string Category, string SerialNumber, string Site);
 record AddDocumentRequest(string Label, string Url);
 record AddCategoryRequest(string Name);
 record AddUserRequest(string Email, string Role);

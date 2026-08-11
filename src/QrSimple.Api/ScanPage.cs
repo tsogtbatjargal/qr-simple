@@ -8,7 +8,7 @@ public static class ScanPage
     {
         string Encode(string value) => WebUtility.HtmlEncode(value);
 
-        var retiredNotice = equipment.Status == "Retired"
+        var retiredNotice = equipment.Status == EquipmentStatus.Retired
             ? "<p><strong>This equipment is no longer in service.</strong></p>"
             : "";
 

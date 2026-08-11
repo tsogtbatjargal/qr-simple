@@ -1,0 +1,5 @@
+{
+  "dotnet.defaultSolution": "QrSimple.slnx",
+  "dotnetAcquisitionExtension.existingDotnetPath": "/var/home/tsogtb/.dotnet/dotnet",
+  "dotnet.unitTests.runSettingsPath": "${workspaceFolder}/.runsettings"
+}

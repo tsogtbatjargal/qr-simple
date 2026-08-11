@@ -52,8 +52,58 @@ app.MapGet("/equipment/{id}/qr", async (Guid id, AppDbContext db, IConfiguration
     return Results.File(qrCode, "image/png");
 });
 
+app.MapGet("/e/{id}", async (Guid id, AppDbContext db) =>
+{
+    var equipment = await db.Equipment.FindAsync(id);
+    if (equipment is null)
+    {
+        return Results.NotFound();
+    }
+
+    var documents = await db.Documents.Where(d => d.EquipmentId == id).ToListAsync();
+
+    return Results.Content(ScanPage.Render(equipment, documents), "text/html");
+});
+
+app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest request, AppDbContext db) =>
+{
+    var equipment = await db.Equipment.FindAsync(id);
+    if (equipment is null)
+    {
+        return Results.NotFound();
+    }
+
+    var document = new Document
+    {
+        Id = Guid.NewGuid(),
+        EquipmentId = id,
+        Label = request.Label,
+        Url = request.Url,
+    };
+
+    db.Documents.Add(document);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/equipment/{id}/documents/{document.Id}", document);
+});
+
+app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
+{
+    var equipment = await db.Equipment.FindAsync(id);
+    if (equipment is null)
+    {
+        return Results.NotFound();
+    }
+
+    equipment.Status = "Retired";
+    await db.SaveChangesAsync();
+
+    return Results.Ok(equipment);
+});
+
 app.Run();
 
 record CreateEquipmentRequest(string Name, string Category, string SerialNumber, string Site);
+record AddDocumentRequest(string Label, string Url);
 
 public partial class Program;

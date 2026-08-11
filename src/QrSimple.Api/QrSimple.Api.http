@@ -1,0 +1,6 @@
+@QrSimple.Api_HostAddress = http://localhost:5078
+
+GET {{QrSimple.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

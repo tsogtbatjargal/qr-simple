@@ -6,4 +6,5 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<Equipment> Equipment => Set<Equipment>();
     public DbSet<Document> Documents => Set<Document>();
+    public DbSet<Category> Categories => Set<Category>();
 }

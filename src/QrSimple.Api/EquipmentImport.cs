@@ -30,6 +30,7 @@ public static class EquipmentImport
         var rows = csv.GetRecords<EquipmentCsvRow>().ToList();
 
         var existingBySerialNumber = await db.Equipment.ToDictionaryAsync(e => e.SerialNumber);
+        var knownCategories = (await db.Categories.Select(c => c.Name).ToListAsync()).ToHashSet();
 
         var createdSerialNumbers = new List<string>();
         var skipped = new List<SkippedRow>();
@@ -37,6 +38,12 @@ public static class EquipmentImport
 
         foreach (var row in rows)
         {
+            if (!knownCategories.Contains(row.Category))
+            {
+                skipped.Add(new SkippedRow(row.SerialNumber, $"Unknown category: {row.Category}"));
+                continue;
+            }
+
             if (existingBySerialNumber.TryGetValue(row.SerialNumber, out var existing))
             {
                 if (!updateExisting)

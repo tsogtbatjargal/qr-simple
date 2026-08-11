@@ -23,6 +23,11 @@ app.UseHttpsRedirection();
 
 app.MapPost("/equipment", async (CreateEquipmentRequest request, AppDbContext db) =>
 {
+    if (!await db.Categories.AnyAsync(c => c.Name == request.Category))
+    {
+        return Results.BadRequest($"Unknown category: {request.Category}");
+    }
+
     var equipment = new Equipment
     {
         Id = Guid.NewGuid(),
@@ -95,6 +100,11 @@ app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, Ap
         return Results.NotFound();
     }
 
+    if (!await db.Categories.AnyAsync(c => c.Name == request.Category))
+    {
+        return Results.BadRequest($"Unknown category: {request.Category}");
+    }
+
     equipment.Name = request.Name;
     equipment.Category = request.Category;
     equipment.SerialNumber = request.SerialNumber;
@@ -132,6 +142,18 @@ app.MapPost("/equipment/{id}/reactivate", async (Guid id, AppDbContext db) =>
     return Results.Ok(equipment);
 });
 
+app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =>
+{
+    var category = new Category { Id = Guid.NewGuid(), Name = request.Name };
+    db.Categories.Add(category);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/categories/{category.Id}", category);
+});
+
+app.MapGet("/categories", async (AppDbContext db) =>
+    Results.Ok(await db.Categories.ToListAsync()));
+
 app.MapPost("/equipment/import", async (IFormFile file, AppDbContext db, HttpRequest request) =>
 {
     var updateExisting = bool.TryParse(request.Form["updateExisting"], out var parsed) && parsed;
@@ -145,5 +167,6 @@ app.Run();
 
 record CreateEquipmentRequest(string Name, string Category, string SerialNumber, string Site);
 record AddDocumentRequest(string Label, string Url);
+record AddCategoryRequest(string Name);
 
 public partial class Program;

@@ -7,7 +7,7 @@ public class CategoryTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Admin_can_add_a_category_and_see_it_in_the_list()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Admin");
 
         var addResponse = await client.PostAsJsonAsync("/categories", new { name = "Excavator" });
         Assert.True(addResponse.IsSuccessStatusCode);
@@ -21,7 +21,7 @@ public class CategoryTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Creating_equipment_with_unknown_category_is_rejected()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var response = await client.PostAsJsonAsync("/equipment", new
         {

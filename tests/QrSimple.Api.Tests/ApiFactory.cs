@@ -43,6 +43,22 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await db.SaveChangesAsync();
     }
 
+    public HttpClient CreateClientAs(string role)
+    {
+        var email = $"{role.ToLowerInvariant()}-{Guid.NewGuid():N}@example.com";
+
+        using (var scope = Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Users.Add(new User { Id = Guid.NewGuid(), Email = email, Role = role });
+            db.SaveChanges();
+        }
+
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TestEmailHeader, email);
+        return client;
+    }
+
     async Task IAsyncLifetime.DisposeAsync()
     {
         await _postgres.DisposeAsync();

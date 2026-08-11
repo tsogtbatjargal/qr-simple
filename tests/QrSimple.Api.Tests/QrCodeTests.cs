@@ -10,7 +10,7 @@ public class QrCodeTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Qr_code_is_available_immediately_after_equipment_is_created()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var createResponse = await client.PostAsJsonAsync("/equipment", new
         {

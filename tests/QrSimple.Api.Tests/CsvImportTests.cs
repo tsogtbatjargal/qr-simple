@@ -8,7 +8,7 @@ public class CsvImportTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Operator_can_bulk_import_new_equipment_from_csv()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var csv = """
             Name,Category,SerialNumber,Site
@@ -36,7 +36,7 @@ public class CsvImportTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Duplicate_serial_number_is_skipped_and_reported_not_overwritten()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var original = await client.PostAsJsonAsync("/equipment", new
         {
@@ -76,7 +76,7 @@ public class CsvImportTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task UpdateExisting_mode_upserts_matching_serial_number_instead_of_skipping()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var original = await client.PostAsJsonAsync("/equipment", new
         {

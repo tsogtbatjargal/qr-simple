@@ -56,7 +56,7 @@ app.MapPost("/equipment", async (CreateEquipmentRequest request, AppDbContext db
     await db.SaveChangesAsync();
 
     return Results.Created($"/equipment/{equipment.Id}", equipment);
-});
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapGet("/equipment/{id}/qr", async (Guid id, AppDbContext db, IConfiguration config) =>
 {
@@ -105,7 +105,7 @@ app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest requ
     await db.SaveChangesAsync();
 
     return Results.Created($"/equipment/{id}/documents/{document.Id}", document);
-});
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, AppDbContext db) =>
 {
@@ -127,7 +127,7 @@ app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, Ap
     await db.SaveChangesAsync();
 
     return Results.Ok(equipment);
-});
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
 {
@@ -141,7 +141,7 @@ app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
     await db.SaveChangesAsync();
 
     return Results.Ok(equipment);
-});
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/equipment/{id}/reactivate", async (Guid id, AppDbContext db) =>
 {
@@ -155,7 +155,7 @@ app.MapPost("/equipment/{id}/reactivate", async (Guid id, AppDbContext db) =>
     await db.SaveChangesAsync();
 
     return Results.Ok(equipment);
-});
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =>
 {
@@ -164,7 +164,7 @@ app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =
     await db.SaveChangesAsync();
 
     return Results.Created($"/categories/{category.Id}", category);
-});
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin"));
 
 app.MapGet("/categories", async (AppDbContext db) =>
     Results.Ok(await db.Categories.ToListAsync()));
@@ -203,7 +203,7 @@ app.MapPost("/equipment/import", async (IFormFile file, AppDbContext db, HttpReq
     await using var stream = file.OpenReadStream();
     var result = await EquipmentImport.RunAsync(stream, db, updateExisting);
     return Results.Ok(result);
-}).DisableAntiforgery();
+}).DisableAntiforgery().RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.Run();
 

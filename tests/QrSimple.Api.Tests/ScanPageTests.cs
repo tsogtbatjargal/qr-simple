@@ -7,7 +7,7 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Anyone_can_view_active_equipment_quick_info_without_logging_in()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var createResponse = await client.PostAsJsonAsync("/equipment", new
         {
@@ -31,7 +31,7 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Retired_equipment_scan_page_shows_no_longer_in_service_indicator()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var createResponse = await client.PostAsJsonAsync("/equipment", new
         {
@@ -54,7 +54,7 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Scan_page_shows_document_links_for_the_equipment()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var createResponse = await client.PostAsJsonAsync("/equipment", new
         {
@@ -82,7 +82,7 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Reactivated_equipment_no_longer_shows_retired_indicator()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var createResponse = await client.PostAsJsonAsync("/equipment", new
         {

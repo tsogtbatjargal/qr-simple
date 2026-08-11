@@ -7,7 +7,7 @@ public class EquipmentEditTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Operator_can_edit_an_existing_equipment_record()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var createResponse = await client.PostAsJsonAsync("/equipment", new
         {

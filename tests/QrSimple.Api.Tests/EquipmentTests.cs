@@ -8,7 +8,7 @@ public class EquipmentTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Operator_can_create_a_single_equipment_record()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Operator");
 
         var response = await client.PostAsJsonAsync("/equipment", new
         {

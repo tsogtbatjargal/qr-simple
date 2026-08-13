@@ -1,0 +1,40 @@
+@page "/app/equipment/{Id:guid}"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+@if (Item is null)
+{
+    <p>Equipment not found.</p>
+}
+else
+{
+    <h1>@Item.Name</h1>
+    <dl>
+        <dt>Category</dt>
+        <dd>@Item.Category</dd>
+        <dt>Serial number</dt>
+        <dd>@Item.SerialNumber</dd>
+        <dt>Site</dt>
+        <dd>@Item.Site</dd>
+        <dt>Status</dt>
+        <dd>@Item.Status</dd>
+    </dl>
+
+    <img src="/equipment/@Item.Id/qr" alt="QR code for @Item.Name" width="300" height="300" />
+    <p><a href="/e/@Item.Id" target="_blank">Public scan page</a></p>
+}
+
+<p><a href="/app">Back to list</a></p>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    protected override string[] AllowedRoles => ["Admin", "Operator", "Reader"];
+
+    private Equipment? Item;
+
+    protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
+    {
+        Item = await db.Equipment.FindAsync(Id);
+    }
+}

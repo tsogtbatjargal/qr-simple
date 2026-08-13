@@ -15,6 +15,7 @@ ASP.NET Core minimal API (`src/QrSimple.Api`) + PostgreSQL via EF Core, tested a
 - **`EquipmentImport`** — bulk CSV import: parsing, duplicate skip+report, update-existing upsert mode.
 - **`RequireRoleFilter`** — an `IEndpointFilter` gating write endpoints by role. Applied per-route via `.AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"))`.
 - **`QrCode`** / **`ScanPage`** — QR PNG generation and the public scan-page HTML, respectively.
+- **`Components/`** — the Blazor Server admin UI (sign-in, Equipment list/add/detail). Pages call the modules above in-process (`EquipmentCatalog`, `QrCode`) rather than the JSON HTTP endpoints — they're another thin adapter, not a client of the API. Use `IDbContextFactory<AppDbContext>` here, not `AppDbContext` directly — a Blazor Server circuit's DI scope outlives a single request.
 
 **Auth split**: authentication (proving who you are — real Google OAuth, wired in `Program.cs` via `AddGoogle`) is separate from authorization (what you can do — `RequireRoleFilter` looking up the authenticated email's `Role` in the `Users` table). Only authorization is covered by automated tests: real Google OAuth needs a live browser and a real account, so it can't run in CI. Tests authenticate via `TestAuthHandler`, a scheme registered only in `ApiFactory` that reads an `X-Test-Email` header. Use `factory.CreateClientAs("Operator")` (or `"Admin"` / `"Reader"`) in a test to get an `HttpClient` that's already seeded a User and attached that header — don't hand-roll authenticated requests.
 
@@ -41,8 +42,8 @@ Before diagnosing missing browser tools, Chrome/CDP, ports 8931/9222/5078, or an
 
 Important facts for every new agent:
 
-- Codex uses the project-scoped HTTP MCP entry in `.codex/config.toml`: `http://127.0.0.1:8931/mcp`. Do not replace it with a `/var/home/...` stdio launcher; that host path is inaccessible to Codex running inside the devcontainer.
-- The devcontainer uses host networking, so its Codex extension can reach the Fedora-hosted Playwright MCP service, Chrome CDP on port 9222, PostgreSQL on port 5432, and the API on port 5078 through `127.0.0.1`.
+- Codex and Claude Code are interchangeable in this devcontainer: both read the same two HTTP MCP servers (`http://127.0.0.1:8931/mcp` Playwright, `http://127.0.0.1:8932/mcp` project MCP), Codex via `.codex/config.toml`, Claude via `.mcp.json` at the repo root. Either agent can pick up a task the other started without re-registering anything. Do not replace either config with a `/var/home/...` stdio launcher; that host path is inaccessible from inside the devcontainer.
+- The devcontainer uses host networking, so either agent can reach the Fedora-hosted Playwright MCP service, Chrome CDP on port 9222, PostgreSQL on port 5432, and the API on port 5078 through `127.0.0.1`.
 - After a PC restart, the user runs `./scripts/start-chrome-for-playwright.sh` once in a **Fedora host terminal**. It starts the existing `qr-simple-db`, starts/replaces the Playwright MCP service, and opens disposable-profile Chrome.
 - The API itself is started in the **devcontainer terminal** with `dotnet run --project src/QrSimple.Api --launch-profile http`.
 - A browser response of `[]` at `/categories` is a successful empty API response, not a broken UI. This project is primarily an API; the rendered public page is `/e/{equipment-id}` after Equipment exists.
@@ -50,15 +51,15 @@ Important facts for every new agent:
 
 ## Project-local MCP for the devcontainer agent
 
-If you are starting a fresh Codex agent for normal `qr-simple` development, first read [docs/local-agent-mcp.md](docs/local-agent-mcp.md). It documents the project-local read-only MCP that lives inside the devcontainer and gives the agent stable workspace/app inspection tools.
+If you are starting a fresh Codex or Claude Code agent for normal `qr-simple` development, first read [docs/local-agent-mcp.md](docs/local-agent-mcp.md). It documents the project-local read-only MCP that lives inside the devcontainer and gives the agent stable workspace/app inspection tools.
 
 Important facts:
 
 - Start it from a **devcontainer terminal** with `./scripts/start-qr-simple-mcp.sh`.
-- It listens on `http://127.0.0.1:8932/mcp` and is registered in `.codex/config.toml`.
+- It listens on `http://127.0.0.1:8932/mcp` and is registered in both `.codex/config.toml` and `.mcp.json`.
 - It is read-only by design. Keep browser automation in the separate Playwright MCP.
 - The first tools are `workspace_search`, `workspace_read`, `app_health`, `route_inventory`, `route_auth_summary`, and `latest_test_failures`.
-- After a PC or VS Code restart, start the MCP again before launching a new Codex agent.
+- After a PC or VS Code restart, start the MCP again before launching a new agent, Codex or Claude.
 
 ### Environment gotchas
 
@@ -72,11 +73,14 @@ This machine is Fedora Silverblue (immutable OS) with no Docker and no `dotnet` 
 
 ## Status
 
-**Done** (all 22 user stories from issue #1, ~22 passing tests): Equipment CRUD + QR generation, public scan page (quick info, Retired indicator, Document links), bulk CSV import (happy path, duplicate skip+report, update-existing), managed/enforced Category list, Users + Google OAuth wiring + `/me` authorization, role-gated write endpoints, Reader's Equipment list with the Retired filter.
+**Done** (all 22 user stories from issue #1, ~28 passing tests): Equipment CRUD + QR generation, public scan page (quick info, Retired indicator, Document links), bulk CSV import (happy path, duplicate skip+report, update-existing), managed/enforced Category list, Users + Google OAuth wiring + `/me` authorization, role-gated write endpoints, Reader's Equipment list with the Retired filter.
+
+**Admin UI** (Blazor Server, embedded in `QrSimple.Api`, not a separate project — see `src/QrSimple.Api/Components/`): sign in with Google, browse Equipment (`/app`), add Equipment through a form (`/app/equipment/add`), view an Equipment's fields and QR code (`/app/equipment/{id}`). `GET /login` triggers the Google challenge, `POST /logout` signs out — both plain minimal-API endpoints, not Blazor components, since a Blazor circuit can't call `Results.Challenge`/`SignOutAsync` itself. Role checks reuse `UserAuthorization.FindAsync` (also used by `RequireRoleFilter` and `/me`) via `RoleGatedComponentBase`, redirecting to `/app/not-authorized` for a signed-in identity with no `Users` row or an insufficient role. Covered by `tests/QrSimple.Api.Tests/AdminUiTests.cs` (auth/role gating + rendering, via the same real-HTTP `WebApplicationFactory` approach as everything else); actually submitting the interactive form and real Google sign-in aren't testable that way — see that file's comments.
 
 **Known, deliberate gaps** (not oversights — see conversation history / commit messages for the reasoning):
-- `POST`/`GET /users` are intentionally ungated. Gating them would create a bootstrap problem: no Admin could ever create the first Admin. Revisit only alongside an actual bootstrap mechanism (e.g. first-user-becomes-admin), not by bolting `RequireRoleFilter` on ad hoc.
-- Real Google OAuth (`Authentication:Google:ClientId`/`ClientSecret` in `appsettings.json`) is a `"REPLACE_ME"` placeholder — untested by design, per the auth split above.
+- `POST`/`GET /users` are intentionally ungated. Gating them would create a bootstrap problem: no Admin could ever create the first Admin. Revisit only alongside an actual bootstrap mechanism (e.g. first-user-becomes-admin), not by bolting `RequireRoleFilter` on ad hoc. The admin UI's `/app/not-authorized` page points a newly-signed-in user at this same manual step rather than automating it.
+- Real Google OAuth (`Authentication:Google:ClientId`/`ClientSecret` in `appsettings.json`) is a `"REPLACE_ME"` placeholder — run `scripts/setup-google-oauth.sh` once with real Cloud Console credentials before sign-in will actually work end to end. Untested by design otherwise, per the auth split above.
+- No category-management UI — the add-equipment form's category dropdown reads existing Categories but can't create one; use `POST /categories` (Admin only) first.
 - Explicit v1 non-goals (from issue #1): offline scanning, built-in file upload/hosting for Documents, non-Google sign-in, structured Site hierarchy, multi-Organization UI, audit/change history.
 
-**Next natural slices** if picking this back up: a real bootstrap mechanism for the first Admin, wiring real Google credentials for a live deployment, or anything from the "explicit non-goals" list above if priorities have changed.
+**Next natural slices** if picking this back up: a real bootstrap mechanism for the first Admin, wiring real Google credentials for a live deployment (the wizard above), a category-management UI, or anything from the "explicit non-goals" list above if priorities have changed.

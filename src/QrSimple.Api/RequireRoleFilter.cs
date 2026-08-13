@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.EntityFrameworkCore;
 
 namespace QrSimple.Api;
 
@@ -9,7 +8,7 @@ public sealed class RequireRoleFilter(params string[] allowedRoles) : IEndpointF
     {
         var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
         var email = context.HttpContext.User.FindFirstValue(ClaimTypes.Email);
-        var user = email is null ? null : await db.Users.SingleOrDefaultAsync(u => u.Email == email);
+        var user = await UserAuthorization.FindAsync(email, db);
 
         if (user is null || !allowedRoles.Contains(user.Role))
         {

@@ -1,6 +1,6 @@
 # Devcontainer agent MCP
 
-This is the project-local MCP used by the new Codex agent inside the `qr-simple` devcontainer.
+This is the project-local MCP used by a new Codex or Claude Code agent inside the `qr-simple` devcontainer. Both are wired to the same two servers — Codex via `.codex/config.toml`, Claude via `.mcp.json` at the repo root — so either agent can pick up where the other left off without re-registering anything.
 
 It exists to give the agent stable read-only tools for the repo and app without depending on the host-only Playwright/browser setup.
 
@@ -21,7 +21,7 @@ Run this from a terminal inside the devcontainer:
 ./scripts/start-qr-simple-mcp.sh
 ```
 
-The server listens on `http://127.0.0.1:8932/mcp` and the Codex config in `.codex/config.toml` points to that endpoint.
+The server listens on `http://127.0.0.1:8932/mcp`. `.codex/config.toml` (Codex) and `.mcp.json` (Claude Code) both point to that endpoint.
 
 If you want to override the port or API base URL:
 
@@ -31,7 +31,7 @@ QR_SIMPLE_MCP_PORT=8932 QR_SIMPLE_API_BASE_URL=http://127.0.0.1:5078 ./scripts/s
 
 ## Readiness check
 
-From the devcontainer, a plain GET should return an HTTP 400 response because the MCP server is reachable but expects a protocol request:
+From the devcontainer, a plain GET should return an HTTP 405 response because the MCP server is reachable but only accepts POST for protocol requests:
 
 ```bash
 curl -sS -o /dev/null -w 'MCP HTTP %{http_code}\n' http://127.0.0.1:8932/mcp
@@ -39,7 +39,7 @@ curl -sS -o /dev/null -w 'MCP HTTP %{http_code}\n' http://127.0.0.1:8932/mcp
 
 ## New-agent prompt
 
-Use this when opening a fresh Codex agent in the devcontainer:
+Use this when opening a fresh Codex or Claude Code agent in the devcontainer — swap "Codex agent" for "Claude Code agent" as needed, the rest is identical:
 
 ```text
 You are running inside the qr-simple VS Code devcontainer. Read AGENTS.md and docs/local-agent-mcp.md completely before taking action.

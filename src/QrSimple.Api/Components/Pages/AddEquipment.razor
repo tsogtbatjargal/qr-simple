@@ -1,0 +1,97 @@
+@page "/app/equipment/add"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+<h1>Add equipment</h1>
+
+@if (Categories is not null && Categories.Count == 0)
+{
+    <p>No categories yet — an admin needs to create one first (<code>POST /categories</code>).</p>
+}
+
+<EditForm Model="Model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Name <InputText @bind-Value="Model.Name" /></label>
+    </div>
+    <div>
+        <label>
+            Category
+            <InputSelect @bind-Value="Model.Category">
+                <option value="">-- select --</option>
+                @if (Categories is not null)
+                {
+                    @foreach (var category in Categories)
+                    {
+                        <option value="@category.Name">@category.Name</option>
+                    }
+                }
+            </InputSelect>
+        </label>
+    </div>
+    <div>
+        <label>Serial number <InputText @bind-Value="Model.SerialNumber" /></label>
+    </div>
+    <div>
+        <label>Site <InputText @bind-Value="Model.Site" /></label>
+    </div>
+
+    <button type="submit">Add</button>
+</EditForm>
+
+@if (Error is not null)
+{
+    <p class="error">@Error</p>
+}
+
+@code {
+    protected override string[] AllowedRoles => ["Admin", "Operator"];
+
+    private List<Category>? Categories;
+    private readonly AddEquipmentModel Model = new();
+    private string? Error;
+
+    protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
+    {
+        Categories = await db.Categories.OrderBy(c => c.Name).ToListAsync();
+    }
+
+    private async Task SubmitAsync()
+    {
+        Error = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var request = new CreateEquipmentRequest(Model.Name, Model.Category, Model.SerialNumber, Model.Site);
+        var result = await EquipmentCatalog.CreateAsync(request, db);
+
+        switch (result)
+        {
+            case EquipmentResult.Success success:
+                Navigation.NavigateTo($"/app/equipment/{success.Equipment.Id}");
+                break;
+            case EquipmentResult.UnknownCategory unknown:
+                Error = $"Unknown category: {unknown.Category}";
+                break;
+            default:
+                Error = "Could not add equipment.";
+                break;
+        }
+    }
+
+    private sealed class AddEquipmentModel
+    {
+        [Required]
+        public string Name { get; set; } = "";
+
+        [Required]
+        public string Category { get; set; } = "";
+
+        [Required]
+        public string SerialNumber { get; set; } = "";
+
+        [Required]
+        public string Site { get; set; } = "";
+    }
+}

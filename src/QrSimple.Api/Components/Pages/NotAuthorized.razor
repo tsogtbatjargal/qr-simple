@@ -1,0 +1,17 @@
+@page "/app/not-authorized"
+@attribute [Authorize]
+
+<h1>Not authorized</h1>
+<p>Your Google account (@Email) is signed in, but isn't set up in qr-simple yet.</p>
+<p>Ask an admin to add you via <code>POST /users</code> with an Admin or Operator role.</p>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+    private string? Email;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateTask!;
+        Email = authState.User.FindFirst(ClaimTypes.Email)?.Value;
+    }
+}

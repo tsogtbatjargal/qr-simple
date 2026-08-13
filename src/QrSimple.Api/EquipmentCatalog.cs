@@ -79,6 +79,17 @@ public static class EquipmentCatalog
         return new EquipmentResult.Success(equipment);
     }
 
+    public static Task<List<Equipment>> ListAsync(bool includeRetired, AppDbContext db)
+    {
+        var query = db.Equipment.AsQueryable();
+        if (!includeRetired)
+        {
+            query = query.Where(e => e.Status == EquipmentStatus.Active);
+        }
+
+        return query.ToListAsync();
+    }
+
     private static Task<bool> IsKnownCategoryAsync(string category, AppDbContext db) =>
         db.Categories.AnyAsync(c => c.Name == category);
 }

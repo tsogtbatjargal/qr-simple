@@ -1,0 +1,52 @@
+@page "/app"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+<h1>Equipment</h1>
+
+<p><a href="/app/equipment/add">+ Add equipment</a></p>
+
+@if (Equipment is null)
+{
+    <p>Loading...</p>
+}
+else if (Equipment.Count == 0)
+{
+    <p>No equipment yet.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Serial</th>
+                <th>Site</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Equipment)
+            {
+                <tr>
+                    <td><a href="/app/equipment/@item.Id">@item.Name</a></td>
+                    <td>@item.Category</td>
+                    <td>@item.SerialNumber</td>
+                    <td>@item.Site</td>
+                    <td>@item.Status</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    protected override string[] AllowedRoles => ["Admin", "Operator", "Reader"];
+    private List<Equipment>? Equipment;
+
+    protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
+    {
+        Equipment = await EquipmentCatalog.ListAsync(includeRetired: false, db);
+    }
+}

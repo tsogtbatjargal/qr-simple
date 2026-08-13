@@ -31,7 +31,16 @@
       "Bash(timeout 180 podman run --rm \\\\\n  -v /run/user/1000/podman/podman.sock:/var/run/docker.sock \\\\\n  -v /var/home/tsogtb/git-projects/qr-simple:/workspaces/qr-simple \\\\\n  -w /workspaces/qr-simple \\\\\n  --userns=keep-id \\\\\n  --security-opt label=disable \\\\\n  --network=host \\\\\n  --user vscode \\\\\n  -e DOCKER_HOST=unix:///var/run/docker.sock \\\\\n  -e TESTCONTAINERS_RYUK_DISABLED=true \\\\\n  mcr.microsoft.com/devcontainers/dotnet:1-10.0 \\\\\n  bash -c 'sudo apt-get update -qq 2>/dev/null && sudo apt-get install -y -qq libfontconfig1 >/dev/null 2>&1 && dotnet test 2>&1 | tail -15')",
       "Bash(podman ps *)",
       "Bash(podman logs *)",
-      "Bash(podman run *)"
+      "Bash(podman run *)",
+      "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code}\\\\n' http://127.0.0.1:8932/mcp --max-time 3)",
+      "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code}\\\\n' http://127.0.0.1:8931/mcp --max-time 3)",
+      "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code}\\\\n' http://127.0.0.1:5078/categories --max-time 3)",
+      "Bash(./scripts/start-qr-simple-mcp.sh)",
+      "Bash(curl -sS -o /dev/null -w 'GET /mcp -> HTTP %{http_code}\\\\n' http://127.0.0.1:8932/mcp --max-time 3)",
+      "Bash(curl -sS -X POST http://127.0.0.1:8932/mcp -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}}' --max-time 5)",
+      "Bash(git -C /workspaces/qr-simple status --short)",
+      "Bash(git -C /workspaces/qr-simple diff)",
+      "Bash(rm -f /tmp/claude-1000/-var-home-tsogtb-git-projects-qr-simple/96bd3a31-d1a3-422f-84aa-a524edd704d3/scratchpad/testout.log)"
     ]
   }
 }

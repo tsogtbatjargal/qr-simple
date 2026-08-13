@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <header>
+        <a href="/app"><strong>qr-simple</strong></a>
+        <AuthorizeView>
+            <Authorized>
+                <span>@context.User.FindFirst(ClaimTypes.Email)?.Value</span>
+                <form method="post" action="/logout">
+                    <button type="submit">Sign out</button>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                <a href="/login">Sign in with Google</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </header>
+    <main>
+        @Body
+    </main>
+</div>

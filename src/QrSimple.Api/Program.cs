@@ -1,26 +1,35 @@
 using System.Security.Claims;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
 using QrSimple.Api;
+using QrSimple.Api.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie()
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+    })
     .AddGoogle(options =>
     {
         options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "";
         options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "";
     });
 builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 
 var app = builder.Build();
 
@@ -38,6 +47,21 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
+
+app.MapGet("/login", (string? returnUrl) =>
+    Results.Challenge(
+        new AuthenticationProperties { RedirectUri = returnUrl ?? "/app" },
+        [GoogleDefaults.AuthenticationScheme]));
+
+app.MapPost("/logout", async (HttpContext ctx) =>
+{
+    await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.Redirect("/");
+});
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.MapPost("/equipment", async (CreateEquipmentRequest request, AppDbContext db) =>
 {
@@ -46,15 +70,8 @@ app.MapPost("/equipment", async (CreateEquipmentRequest request, AppDbContext db
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
 
 app.MapGet("/equipment", async (bool? includeRetired, AppDbContext db) =>
-{
-    var query = db.Equipment.AsQueryable();
-    if (includeRetired != true)
-    {
-        query = query.Where(e => e.Status == EquipmentStatus.Active);
-    }
-
-    return Results.Ok(await query.ToListAsync());
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator", "Reader"));
+    Results.Ok(await EquipmentCatalog.ListAsync(includeRetired == true, db)))
+    .RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator", "Reader"));
 
 app.MapGet("/equipment/{id}/qr", async (Guid id, AppDbContext db, IConfiguration config) =>
 {
@@ -138,7 +155,7 @@ app.MapGet("/categories", async (AppDbContext db) =>
 app.MapGet("/me", async (ClaimsPrincipal principal, AppDbContext db) =>
 {
     var email = principal.FindFirstValue(ClaimTypes.Email);
-    var user = await db.Users.SingleOrDefaultAsync(u => u.Email == email);
+    var user = await UserAuthorization.FindAsync(email, db);
 
     if (user is null)
     {

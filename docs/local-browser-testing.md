@@ -1,6 +1,6 @@
 # Local browser testing
 
-This is the durable handoff for running and controlling `qr-simple` in the real visible Google Chrome browser from Codex inside the VS Code devcontainer.
+This is the durable handoff for running and controlling `qr-simple` in the real visible Google Chrome browser from a Codex or Claude Code agent inside the VS Code devcontainer. Both agents are wired to the same MCP endpoints (Codex via `.codex/config.toml`, Claude via `.mcp.json`), so this doc applies to either — swap "Codex" for "Claude" below as needed.
 
 Read this before changing the devcontainer, installing Node on Fedora, adding port forwarding, or concluding that Playwright is unavailable.
 
@@ -10,11 +10,11 @@ Read this before changing the devcontainer, installing Node on Fedora, adding po
 | --- | --- | --- | --- |
 | PostgreSQL (`qr-simple-db`) | Rootless Podman on Fedora | `127.0.0.1:5432` | Local application database |
 | QR Simple API | VS Code devcontainer | `http://127.0.0.1:5078` | ASP.NET Core API and public scan pages |
-| Playwright MCP (`qr-simple-playwright-mcp`) | Rootless Podman on Fedora | `http://127.0.0.1:8931/mcp` | Browser tools used by Codex |
+| Playwright MCP (`qr-simple-playwright-mcp`) | Rootless Podman on Fedora | `http://127.0.0.1:8931/mcp` | Browser tools used by the agent |
 | Google Chrome | Fedora Flatpak, disposable profile | CDP `127.0.0.1:9222` | Visible browser controlled by Playwright |
-| Codex extension | VS Code devcontainer | Reads `.codex/config.toml` | MCP client |
+| Codex extension / Claude Code | VS Code devcontainer | Reads `.codex/config.toml` / `.mcp.json` | MCP client |
 
-The devcontainer deliberately uses `--network=host`, so all five components can use the same loopback addresses. `.codex/config.toml` therefore uses an HTTP MCP URL instead of a host-only `/var/home/...` launcher path.
+The devcontainer deliberately uses `--network=host`, so all five components can use the same loopback addresses. `.codex/config.toml` and `.mcp.json` therefore both use an HTTP MCP URL instead of a host-only `/var/home/...` launcher path.
 
 Node is not installed on the Fedora host or in the .NET devcontainer. The Playwright service runs Node 22 in its own small Podman container and keeps npm downloads in the `qr-simple-playwright-npm-cache` volume.
 

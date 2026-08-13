@@ -12,7 +12,7 @@ builder.Services.AddMcpServer()
 
 var app = builder.Build();
 
-app.MapMcp();
+app.MapMcp("/mcp");
 
 var port = int.TryParse(Environment.GetEnvironmentVariable("QR_SIMPLE_MCP_PORT"), out var parsedPort)
     ? parsedPort

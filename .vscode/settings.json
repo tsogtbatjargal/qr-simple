@@ -1,7 +1,6 @@
 {
   "dotnet.defaultSolution": "QrSimple.slnx",
-  "dotnetAcquisitionExtension.existingDotnetPath": "/var/home/tsogtb/.dotnet/dotnet",
   "dotnet.unitTests.runSettingsPath": "${workspaceFolder}/.runsettings",
-  "dev.containers.dockerPath": "/var/home/tsogtb/git-projects/qr-simple/scripts/podman-for-vscode.sh",
-  "remote.containers.dockerPath": "/var/home/tsogtb/git-projects/qr-simple/scripts/podman-for-vscode.sh"
+  "remote.containers.dockerPath": "/var/home/tsogtb/git-projects/qr-simple/scripts/podman-for-vscode.sh",
+  "dev.containers.dockerPath": "${workspaceFolder}/scripts/podman-for-vscode.sh"
 }

@@ -35,6 +35,31 @@ dotnet test
 
 These three env vars are also appended to `~/.bashrc`, but non-interactive shells (including how the Bash tool invokes commands, and how Flatpak VS Code launches) don't reliably source it — export them explicitly per command rather than assuming they're already set. A `.runsettings` file also injects them for VSTest specifically (`dotnet test --settings .runsettings`), which is what lets VS Code's Test Explorer work even outside the devcontainer.
 
+## Live browser testing
+
+Before diagnosing missing browser tools, Chrome/CDP, ports 8931/9222/5078, or an empty `[]` response, read [docs/local-browser-testing.md](docs/local-browser-testing.md). It is the durable restart and troubleshooting runbook for this Fedora + Flatpak VS Code + devcontainer setup.
+
+Important facts for every new agent:
+
+- Codex uses the project-scoped HTTP MCP entry in `.codex/config.toml`: `http://127.0.0.1:8931/mcp`. Do not replace it with a `/var/home/...` stdio launcher; that host path is inaccessible to Codex running inside the devcontainer.
+- The devcontainer uses host networking, so its Codex extension can reach the Fedora-hosted Playwright MCP service, Chrome CDP on port 9222, PostgreSQL on port 5432, and the API on port 5078 through `127.0.0.1`.
+- After a PC restart, the user runs `./scripts/start-chrome-for-playwright.sh` once in a **Fedora host terminal**. It starts the existing `qr-simple-db`, starts/replaces the Playwright MCP service, and opens disposable-profile Chrome.
+- The API itself is started in the **devcontainer terminal** with `dotnet run --project src/QrSimple.Api --launch-profile http`.
+- A browser response of `[]` at `/categories` is a successful empty API response, not a broken UI. This project is primarily an API; the rendered public page is `/e/{equipment-id}` after Equipment exists.
+- Do not rebuild the devcontainer merely because browser tools are missing. Check the runbook's readiness commands and restart only the Codex extension/new agent after the MCP service is available.
+
+## Project-local MCP for the devcontainer agent
+
+If you are starting a fresh Codex agent for normal `qr-simple` development, first read [docs/local-agent-mcp.md](docs/local-agent-mcp.md). It documents the project-local read-only MCP that lives inside the devcontainer and gives the agent stable workspace/app inspection tools.
+
+Important facts:
+
+- Start it from a **devcontainer terminal** with `./scripts/start-qr-simple-mcp.sh`.
+- It listens on `http://127.0.0.1:8932/mcp` and is registered in `.codex/config.toml`.
+- It is read-only by design. Keep browser automation in the separate Playwright MCP.
+- The first tools are `workspace_search`, `workspace_read`, `app_health`, `route_inventory`, `route_auth_summary`, and `latest_test_failures`.
+- After a PC or VS Code restart, start the MCP again before launching a new Codex agent.
+
 ### Environment gotchas
 
 This machine is Fedora Silverblue (immutable OS) with no Docker and no `dotnet` preinstalled, and VS Code is a Flatpak. None of this is a config-file fact you'd find by looking — worth knowing before you go hunting:

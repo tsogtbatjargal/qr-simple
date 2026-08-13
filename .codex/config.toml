@@ -1,0 +1,18 @@
+# Project-local browser control for qr-simple. The devcontainer shares the
+# Fedora host network, so Codex can reach this same loopback MCP service from
+# either side of the container boundary. Start it with
+# scripts/start-playwright-mcp-service.sh.
+[mcp_servers.playwright]
+url = "http://127.0.0.1:8931/mcp"
+startup_timeout_sec = 60
+tool_timeout_sec = 120
+enabled = true
+required = false
+
+# Read-only project MCP for the new Codex agent inside the devcontainer.
+[mcp_servers.qr_simple]
+url = "http://127.0.0.1:8932/mcp"
+startup_timeout_sec = 60
+tool_timeout_sec = 120
+enabled = true
+required = false

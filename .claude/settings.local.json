@@ -19,7 +19,19 @@
       "Bash(bash -n /var/home/tsogtb/git-projects/qr-simple/scripts/setup-google-oauth.sh)",
       "Bash(chmod +x /var/home/tsogtb/git-projects/qr-simple/scripts/setup-google-oauth.sh)",
       "Bash(command -v shellcheck)",
-      "Bash(shellcheck /var/home/tsogtb/git-projects/qr-simple/scripts/setup-google-oauth.sh)"
+      "Bash(shellcheck /var/home/tsogtb/git-projects/qr-simple/scripts/setup-google-oauth.sh)",
+      "Bash(timeout 20 curl -s \"https://mcr.microsoft.com/v2/devcontainers/dotnet/tags/list\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(t for t in d['tags'] if '10.0' in t or t=='latest'\\)\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(chmod +x /var/home/tsogtb/git-projects/qr-simple/scripts/podman-for-vscode.sh)",
+      "Bash(bash -n /var/home/tsogtb/git-projects/qr-simple/scripts/podman-for-vscode.sh)",
+      "Bash(timeout 60 podman run --rm \\\\\n  -v /run/user/1000/podman/podman.sock:/var/run/docker.sock:Z \\\\\n  --user 1000:1000 \\\\\n  mcr.microsoft.com/devcontainers/dotnet:1-10.0 \\\\\n  sh -c 'curl -s --unix-socket /var/run/docker.sock http://localhost/_ping; echo \"exit=$?\"')",
+      "Bash(timeout 60 podman run --rm \\\\\n  -v /run/user/1000/podman/podman.sock:/var/run/docker.sock:Z \\\\\n  --userns=keep-id \\\\\n  --user 1000:1000 \\\\\n  mcr.microsoft.com/devcontainers/dotnet:1-10.0 \\\\\n  sh -c 'ls -la /var/run/docker.sock; curl -s --unix-socket /var/run/docker.sock http://localhost/_ping; echo \" exit=$?\"')",
+      "Bash(timeout 180 podman run --rm \\\\\n  -v /run/user/1000/podman/podman.sock:/var/run/docker.sock \\\\\n  -v /var/home/tsogtb/git-projects/qr-simple:/workspaces/qr-simple \\\\\n  -w /workspaces/qr-simple \\\\\n  --userns=keep-id \\\\\n  --security-opt label=disable \\\\\n  --network=host \\\\\n  -e DOCKER_HOST=unix:///var/run/docker.sock \\\\\n  -e TESTCONTAINERS_RYUK_DISABLED=true \\\\\n  mcr.microsoft.com/devcontainers/dotnet:1-10.0 \\\\\n  bash -c '\n    dotnet build -v q >/dev/null 2>&1\n    cat > /tmp/skia_debug_test.cs << \"EOF\"\ntry { var b = QrSimple.Api.QrCode.GeneratePng\\(\"test\"\\); Console.WriteLine\\(\"OK bytes=\" + b.Length\\); }\ncatch \\(Exception ex\\) { Console.WriteLine\\(ex.ToString\\(\\)\\); }\nEOF\n    echo \"--- checking libSkiaSharp presence ---\"\n    find / -iname \"libSkiaSharp*\" 2>/dev/null\n    echo \"--- ldd check ---\"\n    SKIA=$\\(find / -iname \"libSkiaSharp.so\" 2>/dev/null | head -1\\)\n    ldd \"$SKIA\" 2>&1 | grep \"not found\"\n  ')",
+      "Bash(timeout 180 podman run --rm \\\\\n  -v /run/user/1000/podman/podman.sock:/var/run/docker.sock \\\\\n  -v /var/home/tsogtb/git-projects/qr-simple:/workspaces/qr-simple \\\\\n  -w /workspaces/qr-simple \\\\\n  --userns=keep-id \\\\\n  --security-opt label=disable \\\\\n  --network=host \\\\\n  --user vscode \\\\\n  -e DOCKER_HOST=unix:///var/run/docker.sock \\\\\n  -e TESTCONTAINERS_RYUK_DISABLED=true \\\\\n  mcr.microsoft.com/devcontainers/dotnet:1-10.0 \\\\\n  bash -c 'sudo apt-get update -qq 2>/dev/null && sudo apt-get install -y -qq libfontconfig1 >/dev/null 2>&1 && dotnet test 2>&1 | tail -15')",
+      "Bash(podman ps *)",
+      "Bash(podman logs *)",
+      "Bash(podman run *)"
     ]
   }
 }

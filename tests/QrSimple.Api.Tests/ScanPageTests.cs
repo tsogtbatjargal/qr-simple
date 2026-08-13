@@ -26,6 +26,8 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Contains("Drill", html);
         Assert.Contains("DR-0007", html);
         Assert.Contains("West Bench", html);
+        Assert.Contains("name=\"viewport\"", html);
+        Assert.Contains("Equipment details", html);
     }
 
     [Fact]
@@ -77,6 +79,49 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Contains("User Manual", html);
         Assert.Contains("https://docs.example.com/ex-0004-manual.pdf", html);
+        Assert.Contains("class=\"panel document\"", html);
+        Assert.Contains("target=\"_blank\"", html);
+    }
+
+    [Fact]
+    public async Task Scan_page_uses_equipment_photo_document_as_the_header_image()
+    {
+        var client = factory.CreateClientAs("Operator");
+
+        var createResponse = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Pump 32",
+            category = "Pump",
+            serialNumber = "PUM-0032",
+            site = "QA/QC",
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        await client.PostAsJsonAsync($"/equipment/{created!.Id}/documents", new
+        {
+            label = "Equipment Photo",
+            url = "https://images.example.com/pum-0032.png",
+        });
+        await client.PostAsJsonAsync($"/equipment/{created.Id}/documents", new
+        {
+            label = "Maintenance instruction",
+            url = "https://docs.example.com/pum-0032-maintenance.pdf",
+        });
+        await client.PostAsJsonAsync($"/equipment/{created.Id}/documents", new
+        {
+            label = "User manual",
+            url = "https://docs.example.com/pum-0032-manual.pdf",
+        });
+
+        var html = await client.GetStringAsync($"/e/{created.Id}");
+
+        Assert.Contains("<img src=\"https://images.example.com/pum-0032.png\"", html);
+        Assert.Contains("alt=\"Pump 32\"", html);
+        Assert.DoesNotContain(">Equipment Photo</a>", html);
+        Assert.Contains("Maintenance instruction", html);
+        Assert.True(
+            html.IndexOf("User manual", StringComparison.OrdinalIgnoreCase) <
+            html.IndexOf("Maintenance instruction", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

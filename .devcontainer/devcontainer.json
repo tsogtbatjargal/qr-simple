@@ -38,11 +38,21 @@
   // the sibling Postgres container starts successfully.
   "runArgs": ["--userns=keep-id", "--security-opt", "label=disable", "--network=host"],
   "mounts": [
-    "source=/run/user/1000/podman/podman.sock,target=/var/run/docker.sock,type=bind"
+    "source=/run/user/1000/podman/podman.sock,target=/var/run/docker.sock,type=bind",
+    // Keep this app's local database/OAuth configuration across container
+    // rebuilds without exposing the host's user-secrets for unrelated apps.
+    "source=${localEnv:HOME}/.microsoft/usersecrets/b1a96fde-ea71-4042-810e-3c5ed008f005,target=/home/vscode/.microsoft/usersecrets/b1a96fde-ea71-4042-810e-3c5ed008f005,type=bind"
   ],
   "containerEnv": {
     "DOCKER_HOST": "unix:///var/run/docker.sock",
     "TESTCONTAINERS_RYUK_DISABLED": "true"
+  },
+  // This container shares the host network, so an app listening on localhost
+  // is already reachable from Fedora at the same port. VS Code's automatic
+  // forwarding is redundant here and can claim that host port itself, leaving
+  // the real app unable to bind (or creating a forwarding loop that hangs).
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
   },
   "customizations": {
     "vscode": {

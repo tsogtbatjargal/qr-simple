@@ -1,0 +1,76 @@
+@page "/app/users/add"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+<h1>Add user</h1>
+
+<EditForm Model="Model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Email <InputText @bind-Value="Model.Email" /></label>
+    </div>
+    <div>
+        <label>
+            Role
+            <InputSelect @bind-Value="Model.Role">
+                <option value="">-- select --</option>
+                @foreach (var role in Roles.All)
+                {
+                    <option value="@role">@role</option>
+                }
+            </InputSelect>
+        </label>
+    </div>
+
+    <button type="submit">Add</button>
+</EditForm>
+
+@if (Error is not null)
+{
+    <p class="error">@Error</p>
+}
+
+<p><a href="/app/users">Back to users</a></p>
+
+@code {
+    protected override string[] AllowedRoles => [Roles.Admin];
+
+    private readonly AddUserModel Model = new();
+    private string? Error;
+
+    private async Task SubmitAsync()
+    {
+        Error = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var result = await UserCatalog.CreateAsync(Model.Email, Model.Role, db);
+
+        switch (result)
+        {
+            case UserResult.Success success:
+                Navigation.NavigateTo($"/app/users/{success.User.Id}");
+                break;
+            case UserResult.DuplicateEmail dup:
+                Error = $"A user with email {dup.Email} already exists.";
+                break;
+            case UserResult.UnknownRole unknown:
+                Error = $"Unknown role: {unknown.Role}";
+                break;
+            default:
+                Error = "Could not add user.";
+                break;
+        }
+    }
+
+    private sealed class AddUserModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required]
+        public string Role { get; set; } = "";
+    }
+}

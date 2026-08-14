@@ -1,10 +1,15 @@
 @inherits LayoutComponentBase
+@inject IDbContextFactory<AppDbContext> DbFactory
 
 <div class="page">
     <header>
         <a href="/app"><strong>qr-simple</strong></a>
         <AuthorizeView>
             <Authorized>
+                @if (IsAdmin)
+                {
+                    <a href="/app/users">Users</a>
+                }
                 <span>@context.User.FindFirst(ClaimTypes.Email)?.Value</span>
                 <form method="post" action="/logout">
                     <button type="submit">Sign out</button>
@@ -19,3 +24,18 @@
         @Body
     </main>
 </div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+    private bool IsAdmin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateTask!;
+        var email = authState.User.FindFirst(ClaimTypes.Email)?.Value;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var user = await UserAuthorization.FindAsync(email, db);
+        IsAdmin = user?.Role == Roles.Admin;
+    }
+}

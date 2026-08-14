@@ -38,9 +38,13 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// One-time, already-done-for-the-live-DB step: before this code first runs against a database that
+// was previously created via EnsureCreated() (no __EFMigrationsHistory table yet), InitialCreate must
+// be marked as applied by hand — otherwise Migrate() tries to CREATE TABLE for tables that already
+// exist and the app crashes on startup. See the "Adopting migrations" runbook handed off with this change.
 using (var scope = app.Services.CreateScope())
 {
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
+    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
 }
 
 app.UseHttpsRedirection();
@@ -68,11 +72,11 @@ app.MapPost("/equipment", async (CreateEquipmentRequest request, AppDbContext db
 {
     var result = await EquipmentCatalog.CreateAsync(request, db);
     return result.ToHttpResult(equipment => Results.Created($"/equipment/{equipment.Id}", equipment));
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.MapGet("/equipment", async (bool? includeRetired, AppDbContext db) =>
     Results.Ok(await EquipmentCatalog.ListAsync(includeRetired == true, db)))
-    .RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator", "Reader"));
+    .RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator, Roles.Reader));
 
 app.MapGet("/equipment/{id}/qr", async (Guid id, AppDbContext db, IConfiguration config) =>
 {
@@ -121,25 +125,25 @@ app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest requ
     await db.SaveChangesAsync();
 
     return Results.Created($"/equipment/{id}/documents/{document.Id}", document);
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.UpdateAsync(id, request, db);
     return result.ToHttpResult(Results.Ok);
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.RetireAsync(id, db);
     return result.ToHttpResult(Results.Ok);
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.MapPost("/equipment/{id}/reactivate", async (Guid id, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.ReactivateAsync(id, db);
     return result.ToHttpResult(Results.Ok);
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =>
 {
@@ -148,7 +152,7 @@ app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =
     await db.SaveChangesAsync();
 
     return Results.Created($"/categories/{category.Id}", category);
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin"));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
 
 app.MapGet("/categories", async (AppDbContext db) =>
     Results.Ok(await db.Categories.ToListAsync()));
@@ -170,26 +174,41 @@ app.MapGet("/me", async (ClaimsPrincipal principal, AppDbContext db) =>
 
 app.MapPost("/users", async (AddUserRequest request, ClaimsPrincipal principal, AppDbContext db) =>
 {
-    var anyAdminExists = await db.Users.AnyAsync(u => u.Role == "Admin");
+    var anyAdminExists = await db.Users.AnyAsync(u => u.Role == Roles.Admin);
     if (anyAdminExists)
     {
         var caller = await UserAuthorization.FindAsync(principal.FindFirstValue(ClaimTypes.Email), db);
-        if (UserAuthorization.RequireRole(caller, "Admin") is { } denied)
+        if (UserAuthorization.RequireRole(caller, Roles.Admin) is { } denied)
         {
             return denied;
         }
     }
 
-    var user = new User { Id = Guid.NewGuid(), Email = request.Email, Role = request.Role };
-    db.Users.Add(user);
-    await db.SaveChangesAsync();
-
-    return Results.Created($"/users/{user.Id}", user);
+    var result = await UserCatalog.CreateAsync(request.Email, request.Role, db);
+    return result.ToHttpResult(user => Results.Created($"/users/{user.Id}", user));
 });
 
 app.MapGet("/users", async (AppDbContext db) =>
     Results.Ok(await db.Users.ToListAsync()))
-    .RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin"));
+    .RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
+
+app.MapPut("/users/{id}", async (Guid id, UpdateUserRoleRequest request, AppDbContext db) =>
+{
+    var result = await UserCatalog.UpdateRoleAsync(id, request.Role, db);
+    return result.ToHttpResult(Results.Ok);
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
+
+app.MapPost("/users/{id}/deactivate", async (Guid id, ClaimsPrincipal principal, AppDbContext db) =>
+{
+    var result = await UserCatalog.DeactivateAsync(id, principal.FindFirstValue(ClaimTypes.Email), db);
+    return result.ToHttpResult(Results.Ok);
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
+
+app.MapPost("/users/{id}/reactivate", async (Guid id, AppDbContext db) =>
+{
+    var result = await UserCatalog.ReactivateAsync(id, db);
+    return result.ToHttpResult(Results.Ok);
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
 
 app.MapPost("/equipment/import", async (IFormFile file, AppDbContext db, HttpRequest request) =>
 {
@@ -198,7 +217,7 @@ app.MapPost("/equipment/import", async (IFormFile file, AppDbContext db, HttpReq
     await using var stream = file.OpenReadStream();
     var result = await EquipmentImport.RunAsync(stream, db, updateExisting);
     return Results.Ok(result);
-}).DisableAntiforgery().RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin", "Operator"));
+}).DisableAntiforgery().RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.Run();
 
@@ -206,5 +225,6 @@ public record CreateEquipmentRequest(string Name, string Category, string Serial
 record AddDocumentRequest(string Label, string Url);
 record AddCategoryRequest(string Name);
 record AddUserRequest(string Email, string Role);
+record UpdateUserRoleRequest(string Role);
 
 public partial class Program;

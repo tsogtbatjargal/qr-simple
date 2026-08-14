@@ -14,5 +14,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Equipment>()
             .Property(e => e.Status)
             .HasConversion<string>();
+
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Email)
+            .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.IsActive)
+            .HasDefaultValue(true);
     }
 }

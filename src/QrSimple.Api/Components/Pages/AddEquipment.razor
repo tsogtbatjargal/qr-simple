@@ -47,7 +47,7 @@
 }
 
 @code {
-    protected override string[] AllowedRoles => ["Admin", "Operator"];
+    protected override string[] AllowedRoles => [Roles.Admin, Roles.Operator];
 
     private List<Category>? Categories;
     private readonly AddEquipmentModel Model = new();

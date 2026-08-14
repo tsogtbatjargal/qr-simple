@@ -42,7 +42,7 @@ else
 }
 
 @code {
-    protected override string[] AllowedRoles => ["Admin", "Operator", "Reader"];
+    protected override string[] AllowedRoles => [Roles.Admin, Roles.Operator, Roles.Reader];
     private List<Equipment>? Equipment;
 
     protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)

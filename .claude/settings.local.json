@@ -88,5 +88,9 @@
       "Bash(curl -sk https://localhost:7040/users -w '\\\\nHTTP %{http_code}\\\\n')",
       "mcp__playwright__browser_network_requests"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "playwright",
+    "qr_simple"
+  ]
 }

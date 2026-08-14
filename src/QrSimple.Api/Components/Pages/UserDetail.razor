@@ -1,0 +1,124 @@
+@page "/app/users/{Id:guid}"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+@if (Item is null)
+{
+    <p>User not found.</p>
+}
+else
+{
+    <h1>@Item.Email</h1>
+    <p>Status: @(Item.IsActive ? "Active" : "Inactive")</p>
+
+    <EditForm Model="Model" OnValidSubmit="SaveRoleAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div>
+            <label>
+                Role
+                <InputSelect @bind-Value="Model.Role">
+                    @foreach (var role in Roles.All)
+                    {
+                        <option value="@role">@role</option>
+                    }
+                </InputSelect>
+            </label>
+        </div>
+
+        <button type="submit">Save role</button>
+    </EditForm>
+
+    @if (Item.IsActive)
+    {
+        <button @onclick="DeactivateAsync">Deactivate</button>
+    }
+    else
+    {
+        <button @onclick="ReactivateAsync">Reactivate</button>
+    }
+}
+
+@if (Error is not null)
+{
+    <p class="error">@Error</p>
+}
+
+<p><a href="/app/users">Back to users</a></p>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    protected override string[] AllowedRoles => [Roles.Admin];
+
+    private User? Item;
+    private readonly EditRoleModel Model = new();
+    private string? Error;
+    private string? CallerEmail;
+
+    protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
+    {
+        var authState = await AuthenticationStateTask!;
+        CallerEmail = authState.User.FindFirst(ClaimTypes.Email)?.Value;
+
+        Item = await db.Users.FindAsync(Id);
+        if (Item is not null)
+        {
+            Model.Role = Item.Role;
+        }
+    }
+
+    private async Task SaveRoleAsync()
+    {
+        Error = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var result = await UserCatalog.UpdateRoleAsync(Id, Model.Role, db);
+        HandleResult(result);
+    }
+
+    private async Task DeactivateAsync()
+    {
+        Error = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var result = await UserCatalog.DeactivateAsync(Id, CallerEmail, db);
+        HandleResult(result);
+    }
+
+    private async Task ReactivateAsync()
+    {
+        Error = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var result = await UserCatalog.ReactivateAsync(Id, db);
+        HandleResult(result);
+    }
+
+    private void HandleResult(UserResult result)
+    {
+        switch (result)
+        {
+            case UserResult.Success success:
+                Item = success.User;
+                Model.Role = success.User.Role;
+                break;
+            case UserResult.LastAdminProtected:
+                Error = "Cannot remove the last remaining Admin.";
+                break;
+            case UserResult.SelfLockoutBlocked:
+                Error = "You cannot deactivate your own account.";
+                break;
+            case UserResult.UnknownRole unknown:
+                Error = $"Unknown role: {unknown.Role}";
+                break;
+            default:
+                Error = "Could not update user.";
+                break;
+        }
+    }
+
+    private sealed class EditRoleModel
+    {
+        [Required]
+        public string Role { get; set; } = "";
+    }
+}

@@ -29,7 +29,7 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    protected override string[] AllowedRoles => ["Admin", "Operator", "Reader"];
+    protected override string[] AllowedRoles => [Roles.Admin, Roles.Operator, Roles.Reader];
 
     private Equipment? Item;
 

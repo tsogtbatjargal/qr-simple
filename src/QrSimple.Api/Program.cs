@@ -44,6 +44,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -167,8 +168,21 @@ app.MapGet("/me", async (ClaimsPrincipal principal, AppDbContext db) =>
     return Results.Ok(new { user.Email, user.Role });
 }).RequireAuthorization();
 
-app.MapPost("/users", async (AddUserRequest request, AppDbContext db) =>
+app.MapPost("/users", async (AddUserRequest request, ClaimsPrincipal principal, AppDbContext db) =>
 {
+    var anyAdminExists = await db.Users.AnyAsync(u => u.Role == "Admin");
+    if (anyAdminExists)
+    {
+        var callerEmail = principal.FindFirstValue(ClaimTypes.Email);
+        var caller = await UserAuthorization.FindAsync(callerEmail, db);
+        if (caller is null || caller.Role != "Admin")
+        {
+            return Results.Json(
+                "You are not authorized to perform this action.",
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+    }
+
     var user = new User { Id = Guid.NewGuid(), Email = request.Email, Role = request.Role };
     db.Users.Add(user);
     await db.SaveChangesAsync();

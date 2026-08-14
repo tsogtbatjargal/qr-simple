@@ -7,7 +7,7 @@ public class UserTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Admin_can_add_a_user_and_see_it_in_the_list()
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClientAs("Admin");
 
         var addResponse = await client.PostAsJsonAsync("/users", new
         {

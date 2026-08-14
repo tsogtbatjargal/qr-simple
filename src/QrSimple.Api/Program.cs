@@ -58,7 +58,7 @@ app.MapGet("/login", (string? returnUrl) =>
 app.MapPost("/logout", async (HttpContext ctx) =>
 {
     await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-    return Results.Redirect("/");
+    return Results.Redirect("/app");
 });
 
 app.MapRazorComponents<App>()
@@ -188,7 +188,8 @@ app.MapPost("/users", async (AddUserRequest request, ClaimsPrincipal principal, 
 });
 
 app.MapGet("/users", async (AppDbContext db) =>
-    Results.Ok(await db.Users.ToListAsync()));
+    Results.Ok(await db.Users.ToListAsync()))
+    .RequireAuthorization().AddEndpointFilter(new RequireRoleFilter("Admin"));
 
 app.MapPost("/equipment/import", async (IFormFile file, AppDbContext db, HttpRequest request) =>
 {

@@ -82,7 +82,11 @@
       "Bash(git rev-list *)",
       "Bash(dotnet build *)",
       "Bash(git stash *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "mcp__playwright__browser_evaluate",
+      "Bash(kill 356803 356980)",
+      "Bash(curl -sk https://localhost:7040/users -w '\\\\nHTTP %{http_code}\\\\n')",
+      "mcp__playwright__browser_network_requests"
     ]
   }
 }

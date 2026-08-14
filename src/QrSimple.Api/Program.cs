@@ -173,13 +173,10 @@ app.MapPost("/users", async (AddUserRequest request, ClaimsPrincipal principal, 
     var anyAdminExists = await db.Users.AnyAsync(u => u.Role == "Admin");
     if (anyAdminExists)
     {
-        var callerEmail = principal.FindFirstValue(ClaimTypes.Email);
-        var caller = await UserAuthorization.FindAsync(callerEmail, db);
-        if (caller is null || caller.Role != "Admin")
+        var caller = await UserAuthorization.FindAsync(principal.FindFirstValue(ClaimTypes.Email), db);
+        if (UserAuthorization.RequireRole(caller, "Admin") is { } denied)
         {
-            return Results.Json(
-                "You are not authorized to perform this action.",
-                statusCode: StatusCodes.Status403Forbidden);
+            return denied;
         }
     }
 

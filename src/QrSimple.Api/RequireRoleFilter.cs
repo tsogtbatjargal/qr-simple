@@ -10,13 +10,7 @@ public sealed class RequireRoleFilter(params string[] allowedRoles) : IEndpointF
         var email = context.HttpContext.User.FindFirstValue(ClaimTypes.Email);
         var user = await UserAuthorization.FindAsync(email, db);
 
-        if (user is null || !allowedRoles.Contains(user.Role))
-        {
-            return Results.Json(
-                "You are not authorized to perform this action.",
-                statusCode: StatusCodes.Status403Forbidden);
-        }
-
-        return await next(context);
+        var denial = UserAuthorization.RequireRole(user, allowedRoles);
+        return denial ?? await next(context);
     }
 }

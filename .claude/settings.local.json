@@ -74,7 +74,15 @@
       "Bash(echo \"started PID $!\")",
       "Bash(curl -sk -X POST https://localhost:7040/users -H 'Content-Type: application/json' -d '{\"Email\":\"random.intruder@example.com\",\"Role\":\"Admin\"}' -w '\\\\nHTTP %{http_code}\\\\n')",
       "Bash(bash /tmp/claude-1000/-workspaces-qr-simple/f6a32f30-5357-4af8-8c0d-127d594a74de/scratchpad/run_tests.sh)",
-      "Bash(dotnet test *)"
+      "Bash(dotnet test *)",
+      "Bash(git update-ref *)",
+      "Bash(git tag *)",
+      "Bash(git reflog *)",
+      "Bash(git gc *)",
+      "Bash(git rev-list *)",
+      "Bash(dotnet build *)",
+      "Bash(git stash *)",
+      "Bash(git *)"
     ]
   }
 }

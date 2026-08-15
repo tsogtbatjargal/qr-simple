@@ -9,6 +9,9 @@ using QrSimple.Api.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 builder.Services.AddOpenApi();
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
@@ -33,15 +36,16 @@ builder.Services.AddRazorComponents()
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-// One-time, already-done-for-the-live-DB step: before this code first runs against a database that
-// was previously created via EnsureCreated() (no __EFMigrationsHistory table yet), InitialCreate must
-// be marked as applied by hand — otherwise Migrate() tries to CREATE TABLE for tables that already
-// exist and the app crashes on startup. See the "Adopting migrations" runbook handed off with this change.
+// Before this first runs against a database created via the old EnsureCreated() path (no
+// __EFMigrationsHistory table yet), see docs/database-migrations.md for a required one-time
+// step — otherwise Migrate() tries to CREATE TABLE for tables that already exist and crashes.
 using (var scope = app.Services.CreateScope())
 {
     scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();

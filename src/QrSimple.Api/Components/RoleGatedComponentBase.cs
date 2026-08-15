@@ -21,7 +21,7 @@ public abstract class RoleGatedComponentBase : ComponentBase
         await using var db = await DbFactory.CreateDbContextAsync();
         var user = await UserAuthorization.FindAsync(email, db);
 
-        if (user is null || !AllowedRoles.Contains(user.Role))
+        if (user is null || !user.IsActive || !AllowedRoles.Contains(user.Role))
         {
             Navigation.NavigateTo("/app/not-authorized");
             return;

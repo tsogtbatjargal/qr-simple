@@ -79,6 +79,42 @@ public class UsersAdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Deactivated_admin_is_redirected_away_from_the_users_page()
+    {
+        var deactivatedAdminEmail = $"deactivated-admin-{Guid.NewGuid():N}@example.com";
+        var adminClient = factory.CreateClientAs("Admin");
+        var created = await adminClient.PostAsJsonAsync("/users", new { email = deactivatedAdminEmail, role = "Admin" });
+        var user = await created.Content.ReadFromJsonAsync<UserResponse>();
+        await adminClient.PostAsync($"/users/{user!.Id}/deactivate", null);
+
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TestEmailHeader, deactivatedAdminEmail);
+
+        var response = await client.GetAsync("/app/users");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("http://localhost/app/not-authorized", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Deactivated_admin_does_not_see_the_users_nav_link()
+    {
+        var deactivatedAdminEmail = $"deactivated-admin-nav-{Guid.NewGuid():N}@example.com";
+        var adminClient = factory.CreateClientAs("Admin");
+        var created = await adminClient.PostAsJsonAsync("/users", new { email = deactivatedAdminEmail, role = "Admin" });
+        var user = await created.Content.ReadFromJsonAsync<UserResponse>();
+        await adminClient.PostAsync($"/users/{user!.Id}/deactivate", null);
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TestEmailHeader, deactivatedAdminEmail);
+
+        var response = await client.GetAsync("/app");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("/app/users", body);
+    }
+
+    [Fact]
     public async Task Non_admin_does_not_see_the_users_nav_link()
     {
         var readerEmail = $"reader-nav-{Guid.NewGuid():N}@example.com";

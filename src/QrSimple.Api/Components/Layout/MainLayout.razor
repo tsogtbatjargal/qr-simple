@@ -36,6 +36,6 @@
 
         await using var db = await DbFactory.CreateDbContextAsync();
         var user = await UserAuthorization.FindAsync(email, db);
-        IsAdmin = user?.Role == Roles.Admin;
+        IsAdmin = user is { IsActive: true, Role: Roles.Admin };
     }
 }

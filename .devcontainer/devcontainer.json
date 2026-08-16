@@ -45,7 +45,16 @@
   ],
   "containerEnv": {
     "DOCKER_HOST": "unix:///var/run/docker.sock",
-    "TESTCONTAINERS_RYUK_DISABLED": "true"
+    "TESTCONTAINERS_RYUK_DISABLED": "true",
+    // `dotnet dev-certs https --trust` trusts the dev cert in two separate
+    // places on Linux: the NSS database (what Chrome/browsers read) and an
+    // OpenSSL-format export -- but the OpenSSL half only takes effect if
+    // SSL_CERT_DIR points at it. Without this, `--trust` silently only does
+    // half its job: it prints "Successfully trusted..." regardless, but a
+    // follow-up `dotnet dev-certs https --check --trust` (or anything relying
+    // on OpenSSL/curl-style trust) still reports the cert as untrusted.
+    // Verified 2026-08-16.
+    "SSL_CERT_DIR": "/home/vscode/.aspnet/dev-certs/trust:/usr/lib/ssl/certs"
   },
   // This container shares the host network, so an app listening on localhost
   // is already reachable from Fedora at the same port. VS Code's automatic
@@ -75,5 +84,12 @@
   // Google sign-in locally, since the OAuth redirect_uri is registered
   // against localhost:7040) fails outright until this runs once by hand.
   // Running it here every time is a harmless no-op if a cert already exists.
-  "postCreateCommand": "sudo apt-get update -qq; sudo apt-get install -y -qq libfontconfig1 && dotnet restore && dotnet dev-certs https --trust"
+  // libnss3-tools provides certutil, which dev-certs needs to actually write
+  // into the NSS trust database (without it, --trust silently does nothing
+  // real). ~/.pki/nssdb also doesn't exist by default in this image --
+  // certutil -N creates it; `|| true` makes this safe to re-run if it's ever
+  // already initialized. All verified 2026-08-16 against a genuinely fresh
+  // rebuild -- see AGENTS.md's Deployment/environment notes for the full
+  // debugging trail if this regresses again.
+  "postCreateCommand": "sudo apt-get update -qq; sudo apt-get install -y -qq libfontconfig1 libnss3-tools && dotnet restore && mkdir -p ~/.pki/nssdb && (certutil -d sql:$HOME/.pki/nssdb -N --empty-password || true) && dotnet dev-certs https --trust"
 }

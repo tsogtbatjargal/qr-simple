@@ -8,6 +8,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      Explicit reference required for a clean/fresh restore (e.g. Docker builds,
+      CI runners) to correctly discover Blazor's framework static assets
+      (blazor.web.js, blazor.server.js). Without it, dotnet publish silently
+      produces an empty staticwebassets.endpoints.json and no wwwroot/_framework
+      folder at all: the app still builds and boots fine, but every interactive
+      Blazor nav click breaks post-deploy (404 on the framework script).
+      Normally the SDK resolves this package implicitly from the installed
+      shared framework version; that implicit resolution did not happen for
+      this project's exact SDK/environment combination, even with matching SDK
+      versions and a public nuget.org-only feed. Version pinned to match the
+      other net10.0 packages above; bump together with them.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.App.Internal.Assets" Version="10.0.10" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />

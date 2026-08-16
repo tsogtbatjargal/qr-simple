@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+tests/
+.devcontainer/
+.git/
+.github/
+.vscode/
+.codex/
+.config/
+docs/
+scripts/
+AGENTS.md
+CONTEXT.md
+*.md

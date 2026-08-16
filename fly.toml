@@ -1,0 +1,26 @@
+# fly.toml app configuration file generated for qr-simple on 2026-08-16T21:07:13Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'qr-simple'
+primary_region = 'ord'
+
+[build]
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Blazor Server keeps a persistent SignalR/WebSocket circuit alive per
+  # signed-in session; scale-to-zero (auto_stop_machines/min_machines_running=0)
+  # kills that circuit out from under an active user whenever the app idles,
+  # which surfaces as broken navigation on the next click. Keep the single
+  # machine running continuously instead.
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpus = 1
+  memory_mb = 1024

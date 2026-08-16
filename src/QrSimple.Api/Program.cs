@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using QrSimple.Api;
 using QrSimple.Api.Components;
@@ -51,12 +52,36 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
 }
 
+// Fly.io (and most PaaS platforms) terminate TLS at the edge and forward plain
+// HTTP to the container; without this, UseHttpsRedirection() below would see
+// every request as HTTP and redirect-loop, and Google's OAuth challenge would
+// build an http:// redirect_uri that never matches the https:// one registered
+// in Google Cloud Console. KnownNetworks/KnownProxies are cleared because the
+// edge proxy's address isn't a fixed IP we can allowlist -- standard pattern
+// for containerized deploys behind a platform-managed proxy. No-op locally
+// (nothing sets these headers in dev, so the app behaves exactly as before).
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+};
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 app.UseHttpsRedirection();
-app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
+
+// MapStaticAssets (not UseStaticFiles) is required for framework assets like
+// _framework/blazor.web.js: the SDK's newer static-web-assets publish model
+// emits an endpoints manifest instead of physically copying files into
+// wwwroot, and only MapStaticAssets knows how to serve from that manifest.
+// UseStaticFiles alone 404s on every framework asset in a published build,
+// even though `dotnet run` from source still works (it doesn't go through
+// the same publish-time manifest).
+app.MapStaticAssets();
 
 app.MapGet("/login", (string? returnUrl) =>
     Results.Challenge(

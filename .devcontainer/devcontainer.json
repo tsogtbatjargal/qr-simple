@@ -56,7 +56,12 @@
   },
   "customizations": {
     "vscode": {
-      "extensions": ["ms-dotnettools.csdevkit", "ms-dotnettools.csharp"]
+      // anthropic.claude-code / openai.chatgpt were previously installed by
+      // hand, which only persists in one container's writable layer -- a
+      // rebuild (not just a restart) wipes them, same as everything else
+      // outside a mount. Declaring them here makes VS Code auto-reinstall on
+      // every rebuild, same as the two .NET extensions already were.
+      "extensions": ["ms-dotnettools.csdevkit", "ms-dotnettools.csharp", "anthropic.claude-code", "openai.chatgpt"]
     }
   },
   // libfontconfig1 is missing from this base image; SkiaSharp needs it even
@@ -65,5 +70,10 @@
   // not a clean test failure). `apt-get update` exits 100 here regardless,
   // because the image ships an unrelated unsigned yarn.pkg apt source -- that
   // failure is harmless and expected; don't let it short-circuit the install.
-  "postCreateCommand": "sudo apt-get update -qq; sudo apt-get install -y -qq libfontconfig1 && dotnet restore"
+  // dotnet dev-certs isn't mounted from the host, so a rebuild always starts
+  // with no HTTPS dev certificate -- the `https` launch profile (required for
+  // Google sign-in locally, since the OAuth redirect_uri is registered
+  // against localhost:7040) fails outright until this runs once by hand.
+  // Running it here every time is a harmless no-op if a cert already exists.
+  "postCreateCommand": "sudo apt-get update -qq; sudo apt-get install -y -qq libfontconfig1 && dotnet restore && dotnet dev-certs https --trust"
 }

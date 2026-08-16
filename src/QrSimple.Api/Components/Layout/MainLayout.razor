@@ -9,6 +9,7 @@
                 @if (IsAdmin)
                 {
                     <a href="/app/users">Users</a>
+                    <a href="/app/categories">Categories</a>
                 }
                 <span>@context.User.FindFirst(ClaimTypes.Email)?.Value</span>
                 <form method="post" action="/logout">

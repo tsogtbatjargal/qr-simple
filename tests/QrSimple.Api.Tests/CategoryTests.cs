@@ -9,13 +9,24 @@ public class CategoryTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var client = factory.CreateClientAs("Admin");
 
-        var addResponse = await client.PostAsJsonAsync("/categories", new { name = "Excavator" });
+        var addResponse = await client.PostAsJsonAsync("/categories", new { name = "Grader" });
         Assert.True(addResponse.IsSuccessStatusCode);
 
         var listResponse = await client.GetAsync("/categories");
         var categories = await listResponse.Content.ReadFromJsonAsync<List<CategoryResponse>>();
 
-        Assert.Contains(categories!, c => c.Name == "Excavator");
+        Assert.Contains(categories!, c => c.Name == "Grader");
+    }
+
+    [Fact]
+    public async Task Duplicate_category_name_is_rejected()
+    {
+        var client = factory.CreateClientAs("Admin");
+        await client.PostAsJsonAsync("/categories", new { name = "Duplicate-Test-Category" });
+
+        var response = await client.PostAsJsonAsync("/categories", new { name = "Duplicate-Test-Category" });
+
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, response.StatusCode);
     }
 
     [Fact]

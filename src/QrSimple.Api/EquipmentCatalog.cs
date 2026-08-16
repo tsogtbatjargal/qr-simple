@@ -10,12 +10,17 @@ public abstract record EquipmentResult
 
     public sealed record UnknownCategory(string Category) : EquipmentResult;
 
+    public sealed record RestrictedFieldEdit : EquipmentResult;
+
     // Success shape (Created vs Ok) varies per endpoint; NotFound/UnknownCategory don't, so they're mapped once here.
     public IResult ToHttpResult(Func<Equipment, IResult> onSuccess) => this switch
     {
         Success s => onSuccess(s.Equipment),
         NotFound => Results.NotFound(),
         UnknownCategory u => Results.BadRequest($"Unknown category: {u.Category}"),
+        RestrictedFieldEdit => Results.Json(
+            "Operators can only edit Category and Site. Ask an admin to change Name or Serial Number.",
+            statusCode: StatusCodes.Status403Forbidden),
         _ => Results.Problem(),
     };
 }
@@ -37,7 +42,7 @@ public static class EquipmentCatalog
         return new EquipmentResult.Success(equipment);
     }
 
-    public static async Task<EquipmentResult> UpdateAsync(Guid id, CreateEquipmentRequest request, AppDbContext db)
+    public static async Task<EquipmentResult> UpdateAsync(Guid id, CreateEquipmentRequest request, string callerRole, AppDbContext db)
     {
         var equipment = await db.Equipment.FindAsync(id);
         if (equipment is null)
@@ -48,6 +53,12 @@ public static class EquipmentCatalog
         if (!await IsKnownCategoryAsync(request.Category, db))
         {
             return new EquipmentResult.UnknownCategory(request.Category);
+        }
+
+        if (callerRole == Roles.Operator &&
+            (request.Name != equipment.Name || request.SerialNumber != equipment.SerialNumber))
+        {
+            return new EquipmentResult.RestrictedFieldEdit();
         }
 
         equipment.Name = request.Name;

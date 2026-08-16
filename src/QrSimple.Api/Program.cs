@@ -131,9 +131,10 @@ app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest requ
     return Results.Created($"/equipment/{id}/documents/{document.Id}", document);
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
-app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, AppDbContext db) =>
+app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, ClaimsPrincipal principal, AppDbContext db) =>
 {
-    var result = await EquipmentCatalog.UpdateAsync(id, request, db);
+    var caller = await UserAuthorization.FindAsync(principal.FindFirstValue(ClaimTypes.Email), db);
+    var result = await EquipmentCatalog.UpdateAsync(id, request, caller!.Role, db);
     return result.ToHttpResult(Results.Ok);
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
@@ -141,21 +142,18 @@ app.MapPost("/equipment/{id}/retire", async (Guid id, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.RetireAsync(id, db);
     return result.ToHttpResult(Results.Ok);
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
 
 app.MapPost("/equipment/{id}/reactivate", async (Guid id, AppDbContext db) =>
 {
     var result = await EquipmentCatalog.ReactivateAsync(id, db);
     return result.ToHttpResult(Results.Ok);
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
 
 app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =>
 {
-    var category = new Category { Id = Guid.NewGuid(), Name = request.Name };
-    db.Categories.Add(category);
-    await db.SaveChangesAsync();
-
-    return Results.Created($"/categories/{category.Id}", category);
+    var result = await CategoryCatalog.CreateAsync(request.Name, db);
+    return result.ToHttpResult(category => Results.Created($"/categories/{category.Id}", category));
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
 
 app.MapGet("/categories", async (AppDbContext db) =>

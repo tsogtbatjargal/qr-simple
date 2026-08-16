@@ -1,0 +1,44 @@
+@page "/app/categories"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+<h1>Categories</h1>
+
+<p><a href="/app/categories/add">+ Add category</a></p>
+
+@if (Categories is null)
+{
+    <p>Loading...</p>
+}
+else if (Categories.Count == 0)
+{
+    <p>No categories yet.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Categories)
+            {
+                <tr>
+                    <td>@item.Name</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    protected override string[] AllowedRoles => [Roles.Admin];
+    private List<Category>? Categories;
+
+    protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
+    {
+        Categories = await db.Categories.OrderBy(c => c.Name).ToListAsync();
+    }
+}

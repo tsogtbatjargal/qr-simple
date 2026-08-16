@@ -44,7 +44,8 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         });
         var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
 
-        var retireResponse = await client.PostAsync($"/equipment/{created!.Id}/retire", content: null);
+        var adminClient = factory.CreateClientAs("Admin");
+        var retireResponse = await adminClient.PostAsync($"/equipment/{created!.Id}/retire", content: null);
         Assert.True(retireResponse.IsSuccessStatusCode);
 
         var scanResponse = await client.GetAsync($"/e/{created.Id}");
@@ -138,8 +139,9 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         });
         var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
 
-        await client.PostAsync($"/equipment/{created!.Id}/retire", content: null);
-        var reactivateResponse = await client.PostAsync($"/equipment/{created.Id}/reactivate", content: null);
+        var adminClient = factory.CreateClientAs("Admin");
+        await adminClient.PostAsync($"/equipment/{created!.Id}/retire", content: null);
+        var reactivateResponse = await adminClient.PostAsync($"/equipment/{created.Id}/reactivate", content: null);
         Assert.True(reactivateResponse.IsSuccessStatusCode);
 
         var scanResponse = await client.GetAsync($"/e/{created.Id}");

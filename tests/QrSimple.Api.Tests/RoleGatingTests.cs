@@ -52,4 +52,48 @@ public class RoleGatingTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Operator_cannot_retire_or_reactivate_equipment()
+    {
+        var client = factory.CreateClientAs("Operator");
+
+        var created = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Status Guarded Truck",
+            category = "Truck",
+            serialNumber = "SG-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        var retireResponse = await client.PostAsync($"/equipment/{equipment!.Id}/retire", content: null);
+        Assert.Equal(HttpStatusCode.Forbidden, retireResponse.StatusCode);
+
+        var reactivateResponse = await client.PostAsync($"/equipment/{equipment.Id}/reactivate", content: null);
+        Assert.Equal(HttpStatusCode.Forbidden, reactivateResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_can_retire_and_reactivate_equipment()
+    {
+        var client = factory.CreateClientAs("Admin");
+
+        var created = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Admin Status Truck",
+            category = "Truck",
+            serialNumber = "AS-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        var retireResponse = await client.PostAsync($"/equipment/{equipment!.Id}/retire", content: null);
+        Assert.True(retireResponse.IsSuccessStatusCode);
+
+        var reactivateResponse = await client.PostAsync($"/equipment/{equipment.Id}/reactivate", content: null);
+        Assert.True(reactivateResponse.IsSuccessStatusCode);
+    }
+
+    private sealed record CreatedEquipment(Guid Id);
 }

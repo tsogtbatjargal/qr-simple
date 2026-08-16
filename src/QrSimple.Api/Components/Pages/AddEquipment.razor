@@ -6,7 +6,7 @@
 
 @if (Categories is not null && Categories.Count == 0)
 {
-    <p>No categories yet — an admin needs to create one first (<code>POST /categories</code>).</p>
+    <p>No categories yet — <a href="/app/categories/add">add one first</a>.</p>
 }
 
 <EditForm Model="Model" OnValidSubmit="SubmitAsync">

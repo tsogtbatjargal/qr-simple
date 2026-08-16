@@ -1,0 +1,57 @@
+@page "/app/categories/add"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+<h1>Add category</h1>
+
+<EditForm Model="Model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Name <InputText @bind-Value="Model.Name" /></label>
+    </div>
+
+    <button type="submit">Add</button>
+</EditForm>
+
+@if (Error is not null)
+{
+    <p class="error">@Error</p>
+}
+
+<p><a href="/app/categories">Back to categories</a></p>
+
+@code {
+    protected override string[] AllowedRoles => [Roles.Admin];
+
+    private readonly AddCategoryModel Model = new();
+    private string? Error;
+
+    private async Task SubmitAsync()
+    {
+        Error = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var result = await CategoryCatalog.CreateAsync(Model.Name, db);
+
+        switch (result)
+        {
+            case CategoryResult.Success:
+                Navigation.NavigateTo("/app/categories");
+                break;
+            case CategoryResult.DuplicateName dup:
+                Error = $"A category named \"{dup.Name}\" already exists.";
+                break;
+            default:
+                Error = "Could not add category.";
+                break;
+        }
+    }
+
+    private sealed class AddCategoryModel
+    {
+        [Required]
+        public string Name { get; set; } = "";
+    }
+}

@@ -9,19 +9,99 @@
 else
 {
     <h1>@Item.Name</h1>
-    <dl>
-        <dt>Category</dt>
-        <dd>@Item.Category</dd>
-        <dt>Serial number</dt>
-        <dd>@Item.SerialNumber</dd>
-        <dt>Site</dt>
-        <dd>@Item.Site</dd>
-        <dt>Status</dt>
-        <dd>@Item.Status</dd>
-    </dl>
+
+    @if (CanEditNameAndSerialNumber)
+    {
+        <EditForm Model="Model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div>
+                <label>Name <InputText @bind-Value="Model.Name" /></label>
+            </div>
+            <div>
+                <label>
+                    Category
+                    <InputSelect @bind-Value="Model.Category">
+                        @foreach (var category in Categories!)
+                        {
+                            <option value="@category.Name">@category.Name</option>
+                        }
+                    </InputSelect>
+                </label>
+            </div>
+            <div>
+                <label>Serial number <InputText @bind-Value="Model.SerialNumber" /></label>
+            </div>
+            <div>
+                <label>Site <InputText @bind-Value="Model.Site" /></label>
+            </div>
+
+            <button type="submit">Save</button>
+        </EditForm>
+    }
+    else if (CanEditCategoryAndSite)
+    {
+        <dl>
+            <dt>Serial number</dt>
+            <dd>@Item.SerialNumber</dd>
+        </dl>
+
+        <EditForm Model="Model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div>
+                <label>
+                    Category
+                    <InputSelect @bind-Value="Model.Category">
+                        @foreach (var category in Categories!)
+                        {
+                            <option value="@category.Name">@category.Name</option>
+                        }
+                    </InputSelect>
+                </label>
+            </div>
+            <div>
+                <label>Site <InputText @bind-Value="Model.Site" /></label>
+            </div>
+
+            <button type="submit">Save</button>
+        </EditForm>
+    }
+    else
+    {
+        <dl>
+            <dt>Category</dt>
+            <dd>@Item.Category</dd>
+            <dt>Serial number</dt>
+            <dd>@Item.SerialNumber</dd>
+            <dt>Site</dt>
+            <dd>@Item.Site</dd>
+        </dl>
+    }
+
+    <p>Status: @Item.Status</p>
+
+    @if (CanChangeStatus)
+    {
+        @if (Item.Status == EquipmentStatus.Active)
+        {
+            <button @onclick="RetireAsync">Retire</button>
+        }
+        else
+        {
+            <button @onclick="ReactivateAsync">Reactivate</button>
+        }
+    }
 
     <img src="/equipment/@Item.Id/qr" alt="QR code for @Item.Name" width="300" height="300" />
     <p><a href="/e/@Item.Id" target="_blank">Public scan page</a></p>
+}
+
+@if (Error is not null)
+{
+    <p class="error">@Error</p>
 }
 
 <p><a href="/app">Back to list</a></p>
@@ -32,9 +112,94 @@ else
     protected override string[] AllowedRoles => [Roles.Admin, Roles.Operator, Roles.Reader];
 
     private Equipment? Item;
+    private List<Category>? Categories;
+    private readonly EditEquipmentModel Model = new();
+    private string? Error;
+    private string? CallerRole;
+
+    private bool CanEditNameAndSerialNumber => CallerRole == Roles.Admin;
+    private bool CanEditCategoryAndSite => CallerRole == Roles.Operator;
+    private bool CanChangeStatus => CallerRole == Roles.Admin;
 
     protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
     {
+        var authState = await AuthenticationStateTask!;
+        var email = authState.User.FindFirst(ClaimTypes.Email)?.Value;
+        var caller = await UserAuthorization.FindAsync(email, db);
+        CallerRole = caller?.Role;
+
         Item = await db.Equipment.FindAsync(Id);
+        Categories = await db.Categories.OrderBy(c => c.Name).ToListAsync();
+
+        if (Item is not null)
+        {
+            Model.Name = Item.Name;
+            Model.Category = Item.Category;
+            Model.SerialNumber = Item.SerialNumber;
+            Model.Site = Item.Site;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        Error = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var request = new CreateEquipmentRequest(Model.Name, Model.Category, Model.SerialNumber, Model.Site);
+        var result = await EquipmentCatalog.UpdateAsync(Id, request, CallerRole ?? "", db);
+        HandleResult(result);
+    }
+
+    private async Task RetireAsync()
+    {
+        Error = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var result = await EquipmentCatalog.RetireAsync(Id, db);
+        HandleResult(result);
+    }
+
+    private async Task ReactivateAsync()
+    {
+        Error = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var result = await EquipmentCatalog.ReactivateAsync(Id, db);
+        HandleResult(result);
+    }
+
+    private void HandleResult(EquipmentResult result)
+    {
+        switch (result)
+        {
+            case EquipmentResult.Success success:
+                Item = success.Equipment;
+                Model.Name = success.Equipment.Name;
+                Model.Category = success.Equipment.Category;
+                Model.SerialNumber = success.Equipment.SerialNumber;
+                Model.Site = success.Equipment.Site;
+                break;
+            case EquipmentResult.UnknownCategory unknown:
+                Error = $"Unknown category: {unknown.Category}";
+                break;
+            case EquipmentResult.RestrictedFieldEdit:
+                Error = "Operators can only edit Category and Site.";
+                break;
+            default:
+                Error = "Could not update equipment.";
+                break;
+        }
+    }
+
+    private sealed class EditEquipmentModel
+    {
+        [Required]
+        public string Name { get; set; } = "";
+
+        [Required]
+        public string Category { get; set; } = "";
+
+        [Required]
+        public string SerialNumber { get; set; } = "";
+
+        [Required]
+        public string Site { get; set; } = "";
     }
 }

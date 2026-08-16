@@ -82,5 +82,48 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Contains($"/equipment/{equipment.Id}/qr", body);
     }
 
+    [Fact]
+    public async Task Admin_sees_a_full_edit_form_and_a_status_button_on_equipment_detail_page()
+    {
+        var client = factory.CreateClientAs("Admin");
+        var created = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Admin Edit Truck",
+            category = "Truck",
+            serialNumber = "AET-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
+
+        var response = await client.GetAsync($"/app/equipment/{equipment!.Id}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Name <input", body);
+        Assert.Contains("Retire", body);
+    }
+
+    [Fact]
+    public async Task Operator_sees_a_restricted_edit_form_and_no_status_button_on_equipment_detail_page()
+    {
+        var adminClient = factory.CreateClientAs("Admin");
+        var created = await adminClient.PostAsJsonAsync("/equipment", new
+        {
+            name = "Operator View Truck",
+            category = "Truck",
+            serialNumber = "OVT-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
+
+        var operatorClient = factory.CreateClientAs("Operator");
+        var response = await operatorClient.GetAsync($"/app/equipment/{equipment!.Id}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("Name <input", body);
+        Assert.DoesNotContain("Retire", body);
+        Assert.DoesNotContain("Reactivate", body);
+        Assert.Contains("Site", body);
+    }
+
     private sealed record EquipmentResponse(Guid Id);
 }

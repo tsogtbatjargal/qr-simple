@@ -37,7 +37,8 @@ public class EquipmentListTests(ApiFactory factory) : IClassFixture<ApiFactory>
             site = "North Pit",
         });
         var retiredCreated = await retired.Content.ReadFromJsonAsync<CreatedEquipment>();
-        await operatorClient.PostAsync($"/equipment/{retiredCreated!.Id}/retire", content: null);
+        var adminClient = factory.CreateClientAs("Admin");
+        await adminClient.PostAsync($"/equipment/{retiredCreated!.Id}/retire", content: null);
 
         var readerClient = factory.CreateClientAs("Reader");
         var listResponse = await readerClient.GetAsync("/equipment");
@@ -62,7 +63,8 @@ public class EquipmentListTests(ApiFactory factory) : IClassFixture<ApiFactory>
             site = "North Pit",
         });
         var retiredCreated = await retired.Content.ReadFromJsonAsync<CreatedEquipment>();
-        await operatorClient.PostAsync($"/equipment/{retiredCreated!.Id}/retire", content: null);
+        var adminClient = factory.CreateClientAs("Admin");
+        await adminClient.PostAsync($"/equipment/{retiredCreated!.Id}/retire", content: null);
 
         var listResponse = await operatorClient.GetAsync("/equipment?includeRetired=true");
         var equipment = await listResponse.Content.ReadFromJsonAsync<List<ListedEquipment>>();

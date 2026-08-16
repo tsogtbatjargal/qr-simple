@@ -25,6 +25,12 @@
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <!-- Microsoft.AspNetCore.OpenApi 10.0.10 transitively pulls Microsoft.OpenApi
+         2.0.0, which has a known high-severity vulnerability (stack overflow on
+         a circular schema reference, GHSA-v5pm-xwqc-g5wc; fixed in 2.7.5+).
+         Overriding to the latest 2.x patch, not jumping to 3.x, since 3.x is a
+         new major line Microsoft.AspNetCore.OpenApi 10.0.10 wasn't built against. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.12.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
       <PrivateAssets>all</PrivateAssets>

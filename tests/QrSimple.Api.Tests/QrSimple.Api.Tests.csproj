@@ -10,8 +10,18 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <!-- Pinned to match the ProjectReference to QrSimple.Api (10.0.10):
+         without this, an unrelated transitive dependency pulls 10.0.4 as
+         "primary", producing an MSB3277 version-conflict warning. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.1" />
+    <!-- SSH.NET is a transitive dependency of Testcontainers (used for an SSH
+         Docker-host transport this project never uses); 2025.1.0 has a known
+         high-severity path-traversal vulnerability in ScpClient's recursive
+         download (GHSA-q939-rpr3-3284, fixed in 2026.0.0). Overridden directly
+         since Testcontainers.PostgreSql doesn't expose a newer floor itself. -->
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />

@@ -86,6 +86,62 @@ http://127.0.0.1:5078/categories
 
 Then inspect the page URL/body and browser console. An `[]` body is expected until categories are created.
 
+## Testing real Google sign-in (admin UI)
+
+The `http` launch profile (port 5078 only, used above) is enough for the plain API and public scan
+page, but **not sufficient for testing real Google sign-in** or anything under `/app`. The OAuth
+`redirect_uri` is hardcoded to `https://localhost:7040/signin-google` (both in Google Cloud Console
+and in `scripts/setup-google-oauth.sh`), so the admin UI's login flow only works when the app is
+started with the `https` profile instead:
+
+```bash
+dotnet run --project src/QrSimple.Api --launch-profile https
+```
+
+This binds `https://localhost:7040` (required for OAuth) *and* `http://localhost:5078` — you don't
+lose the plain API port by using it, so default to `https` whenever admin-UI/sign-in testing is a
+possibility.
+
+Other gotchas specific to this flow:
+
+- **VS Code's automatic port-forwarding can silently occupy port 7040**, conflicting with the
+  app's own HTTPS listener and corrupting the OAuth state-cookie round-trip (surfaces as
+  `AuthenticationFailureException: The oauth state was missing or invalid`). Fix: free it via VS
+  Code's Ports panel ("Stop Forwarding Port") — do not `kill` the forwarder process directly.
+- Even after `dotnet dev-certs https --trust`, Playwright's Chromium (the disposable-profile
+  Chrome from `start-chrome-for-playwright.sh`) still shows `net::ERR_CERT_AUTHORITY_INVALID` on
+  first navigation to `https://localhost:7040`. Click through the interstitial once (Advanced →
+  "Proceed to localhost (unsafe)") — this persists for the rest of that profile's lifetime.
+- Signing in alone isn't enough — a `Users` row must exist for that email before `/me` and the
+  admin UI treat it as authorized. The first Admin bootstraps via an unauthenticated `POST /users`
+  call, allowed only while no Admin exists yet in the table; see `AGENTS.md`'s Architecture
+  section and `docs/database-migrations.md`.
+- `TestAuthHandler` (the `X-Test-Email` header used by `dotnet test`) is registered only inside
+  `ApiFactory` for tests — it does not exist on a real `dotnet run` process. Exercising an
+  authorized route live means either a real signed-in Google session, or a Playwright
+  `browser_evaluate` page-context `fetch()` call from a tab that's already signed in (it
+  automatically carries the session cookie) — don't try to fake an identity header against the
+  live server.
+- A page that still shows the user as logged in right after clicking "Sign out" is **not proof
+  sign-out failed**. Chrome's live Google SSO session will silently re-authenticate via
+  `prompt=none` on the very next request that needs auth, making a working sign-out look broken.
+  To verify sign-out actually worked, hit a protected endpoint (e.g. `/me`) right after and check
+  it starts a fresh auth challenge, or inspect `browser_network_requests` for the full redirect
+  chain (`/app` → 302 → `/login` → Google `prompt=none` silent re-auth → back to `/app` 200 is the
+  *expected*, correct sequence — not a bug) — don't trust what the rendered page shows moments
+  later.
+
+## Restarting the API after a code change
+
+A backgrounded `dotnet run` process has no hot reload — it serves the DLL built at start time.
+After editing code, do the restart as **discrete steps**, not one chained command (a single
+compound `kill && dotnet run &` is prone to the `nohup`'d process silently never starting):
+
+1. Kill the old process.
+2. Confirm the port is actually free.
+3. Run a fresh `nohup dotnet run --project src/QrSimple.Api --launch-profile <profile> > <logfile> 2>&1 &` (with `disown`) from the repo root.
+4. Poll the log for `Now listening on` before proceeding — don't assume step 3 succeeded silently.
+
 ## What the application displays
 
 `qr-simple` is primarily a minimal API, not a general frontend application. `/categories` returns JSON. The public rendered scan page is:

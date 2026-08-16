@@ -117,7 +117,14 @@
       "mcp__playwright__browser_fill_form",
       "mcp__playwright__browser_select_option",
       "Bash(curl -sk https://localhost:7040/me -H \"X-Test-Email: sanity-check-test-user@example.com\" -w \"\\\\nHTTP %{http_code}\\\\n\")",
-      "Bash(psql -h localhost -p 5432 -U postgres -d postgres -c \"SELECT \\\\\"Email\\\\\", \\\\\"Role\\\\\", \\\\\"IsActive\\\\\" FROM \\\\\"Users\\\\\" WHERE \\\\\"Email\\\\\"='sanity-check-test-user@example.com';\")"
+      "Bash(psql -h localhost -p 5432 -U postgres -d postgres -c \"SELECT \\\\\"Email\\\\\", \\\\\"Role\\\\\", \\\\\"IsActive\\\\\" FROM \\\\\"Users\\\\\" WHERE \\\\\"Email\\\\\"='sanity-check-test-user@example.com';\")",
+      "Bash(xargs -I{} sh -c 'echo == {} ==; cat {}')",
+      "Bash(curl -sS -o /dev/null -w 'port 7040: %{http_code}\\\\n' -k https://localhost:7040/categories --max-time 2)",
+      "Bash(echo \"started pid $!\")",
+      "Bash(curl -sS -k -w '\\\\nHTTP %{http_code}\\\\n' https://localhost:7040/equipment -X POST -H 'Content-Type: application/json' -d '{\"name\":\"x\",\"category\":\"y\",\"serialNumber\":\"z\",\"site\":\"s\"}')",
+      "Bash(curl -sS -k -w '\\\\nHTTP %{http_code}\\\\n' https://localhost:7040/users)",
+      "Bash(curl -sS http://127.0.0.1:9222/json/version -m 3)",
+      "Bash(curl -sS -o /dev/null -w 'MCP %{http_code}\\\\n' -m 3 http://127.0.0.1:8931/mcp)"
     ]
   },
   "enabledMcpjsonServers": [

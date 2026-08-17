@@ -52,6 +52,7 @@
         switch (result)
         {
             case UserResult.Success success:
+                Toast.Show("User added.");
                 Navigation.NavigateTo($"/app/users/{success.User.Id}");
                 break;
             case UserResult.DuplicateEmail dup:

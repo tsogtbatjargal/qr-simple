@@ -40,6 +40,7 @@
         switch (result)
         {
             case CategoryResult.Success:
+                Toast.Show("Category added.");
                 Navigation.NavigateTo("/app/categories");
                 break;
             case CategoryResult.DuplicateName dup:

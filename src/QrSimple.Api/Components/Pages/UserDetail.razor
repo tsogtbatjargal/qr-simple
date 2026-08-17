@@ -35,13 +35,19 @@ else
     <div class="button-row">
         @if (Item.IsActive)
         {
-            <button class="btn btn-danger" @onclick="DeactivateAsync">Deactivate</button>
+            <button class="btn btn-danger" @onclick="() => DeactivateConfirm!.Show()">Deactivate</button>
         }
         else
         {
             <button class="btn btn-primary" @onclick="ReactivateAsync">Reactivate</button>
         }
     </div>
+
+    <ConfirmDialog @ref="DeactivateConfirm"
+                    Title="Deactivate this user?"
+                    Message="@($"\"{Item.Email}\" will lose access to qr-simple until reactivated.")"
+                    ConfirmText="Deactivate"
+                    OnConfirmed="DeactivateAsync" />
 }
 
 @if (Error is not null)
@@ -60,6 +66,7 @@ else
     private readonly EditRoleModel Model = new();
     private string? Error;
     private string? CallerEmail;
+    private ConfirmDialog? DeactivateConfirm;
 
     protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
     {
@@ -78,7 +85,7 @@ else
         Error = null;
         await using var db = await DbFactory.CreateDbContextAsync();
         var result = await UserCatalog.UpdateRoleAsync(Id, Model.Role, db);
-        HandleResult(result);
+        HandleResult(result, "Role saved.");
     }
 
     private async Task DeactivateAsync()
@@ -86,7 +93,7 @@ else
         Error = null;
         await using var db = await DbFactory.CreateDbContextAsync();
         var result = await UserCatalog.DeactivateAsync(Id, CallerEmail, db);
-        HandleResult(result);
+        HandleResult(result, "User deactivated.");
     }
 
     private async Task ReactivateAsync()
@@ -94,16 +101,17 @@ else
         Error = null;
         await using var db = await DbFactory.CreateDbContextAsync();
         var result = await UserCatalog.ReactivateAsync(Id, db);
-        HandleResult(result);
+        HandleResult(result, "User reactivated.");
     }
 
-    private void HandleResult(UserResult result)
+    private void HandleResult(UserResult result, string successMessage)
     {
         switch (result)
         {
             case UserResult.Success success:
                 Item = success.User;
                 Model.Role = success.User.Role;
+                Toast.Show(successMessage);
                 break;
             case UserResult.LastAdminProtected:
                 Error = "Cannot remove the last remaining Admin.";

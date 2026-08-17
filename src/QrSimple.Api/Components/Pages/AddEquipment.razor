@@ -71,6 +71,7 @@
         switch (result)
         {
             case EquipmentResult.Success success:
+                Toast.Show("Equipment added.");
                 Navigation.NavigateTo($"/app/equipment/{success.Equipment.Id}");
                 break;
             case EquipmentResult.UnknownCategory unknown:

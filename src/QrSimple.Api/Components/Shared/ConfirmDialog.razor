@@ -1,0 +1,37 @@
+@if (Visible)
+{
+    <div class="modal-backdrop" @onclick="Cancel">
+        <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" @onclick:stopPropagation="true">
+            <h2 id="confirm-dialog-title">@Title</h2>
+            <p>@Message</p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost btn-ghost-light" @onclick="Cancel">@CancelText</button>
+                <button type="button" class="btn btn-danger" @onclick="Confirm">@ConfirmText</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "Are you sure?";
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    [Parameter] public string CancelText { get; set; } = "Cancel";
+    [Parameter] public EventCallback OnConfirmed { get; set; }
+
+    private bool Visible;
+
+    public void Show()
+    {
+        Visible = true;
+        StateHasChanged();
+    }
+
+    private void Cancel() => Visible = false;
+
+    private async Task Confirm()
+    {
+        Visible = false;
+        await OnConfirmed.InvokeAsync();
+    }
+}

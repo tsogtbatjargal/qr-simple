@@ -41,7 +41,30 @@
     "source=/run/user/1000/podman/podman.sock,target=/var/run/docker.sock,type=bind",
     // Keep this app's local database/OAuth configuration across container
     // rebuilds without exposing the host's user-secrets for unrelated apps.
-    "source=${localEnv:HOME}/.microsoft/usersecrets/b1a96fde-ea71-4042-810e-3c5ed008f005,target=/home/vscode/.microsoft/usersecrets/b1a96fde-ea71-4042-810e-3c5ed008f005,type=bind"
+    "source=${localEnv:HOME}/.microsoft/usersecrets/b1a96fde-ea71-4042-810e-3c5ed008f005,target=/home/vscode/.microsoft/usersecrets/b1a96fde-ea71-4042-810e-3c5ed008f005,type=bind",
+    // Persist Claude Code's login, memory, session history, settings, and
+    // skills/plugins cache across rebuilds. A named volume (not a host bind
+    // mount) deliberately keeps this container-local: the host regularly
+    // runs its own concurrent Claude Code/Codex sessions, and sharing
+    // ~/.claude's hot-path files (history.jsonl, sessions/) with a
+    // simultaneously-running host process risks corrupting the host's own
+    // state, not just the container's. Starts empty on first use (one more
+    // login needed), then persists from then on -- verified 2026-08-16 that
+    // the actual OAuth token lives at ~/.claude/.credentials.json (inside
+    // this directory), not the sibling ~/.claude.json below.
+    "source=qr-simple-claude-home,target=/home/vscode/.claude,type=volume",
+    // ~/.claude.json is a SEPARATE file, a sibling of ~/.claude/, so the
+    // volume above can't reach it -- and a volume mounted onto a path that
+    // doesn't already exist as a file risks Docker/Podman creating a
+    // directory there instead, which would break Claude Code's JSON parsing
+    // outright. Bind-mounting the actual host file avoids that failure mode
+    // (same proven pattern as the user-secrets mount above). This file is
+    // written far less often than the session state in the volume above
+    // (mostly onboarding/telemetry/trust-cache, plus possibly OAuth state
+    // for third-party MCP integrations like Gmail/Drive/Calendar/Canva), so
+    // sharing it with the host is a much smaller corruption window than
+    // sharing all of ~/.claude would be.
+    "source=${localEnv:HOME}/.claude.json,target=/home/vscode/.claude.json,type=bind"
   ],
   "containerEnv": {
     "DOCKER_HOST": "unix:///var/run/docker.sock",

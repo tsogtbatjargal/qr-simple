@@ -34,6 +34,7 @@ builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddScoped<ToastService>();
 
 var app = builder.Build();
 

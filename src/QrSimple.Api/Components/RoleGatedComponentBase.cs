@@ -9,6 +9,7 @@ public abstract class RoleGatedComponentBase : ComponentBase
 {
     [Inject] protected IDbContextFactory<AppDbContext> DbFactory { get; set; } = default!;
     [Inject] protected NavigationManager Navigation { get; set; } = default!;
+    [Inject] protected ToastService Toast { get; set; } = default!;
     [CascadingParameter] protected Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
     protected abstract string[] AllowedRoles { get; }

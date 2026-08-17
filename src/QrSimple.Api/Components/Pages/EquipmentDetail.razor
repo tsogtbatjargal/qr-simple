@@ -92,7 +92,7 @@ else
         <div class="button-row">
             @if (Item.Status == EquipmentStatus.Active)
             {
-                <button class="btn btn-danger" @onclick="RetireAsync">Retire</button>
+                <button class="btn btn-danger" @onclick="() => RetireConfirm!.Show()">Retire</button>
             }
             else
             {
@@ -103,6 +103,12 @@ else
 
     <img class="qr-code" src="/equipment/@Item.Id/qr" alt="QR code for @Item.Name" width="240" height="240" />
     <p><a href="/e/@Item.Id" target="_blank">Public scan page ↗</a></p>
+
+    <ConfirmDialog @ref="RetireConfirm"
+                    Title="Retire this equipment?"
+                    Message="@($"\"{Item.Name}\" will be marked retired and hidden from the active equipment list.")"
+                    ConfirmText="Retire"
+                    OnConfirmed="RetireAsync" />
 }
 
 @if (Error is not null)
@@ -122,6 +128,7 @@ else
     private readonly EditEquipmentModel Model = new();
     private string? Error;
     private string? CallerRole;
+    private ConfirmDialog? RetireConfirm;
 
     private bool CanEditNameAndSerialNumber => CallerRole == Roles.Admin;
     private bool CanEditCategoryAndSite => CallerRole == Roles.Operator;
@@ -152,7 +159,7 @@ else
         await using var db = await DbFactory.CreateDbContextAsync();
         var request = new CreateEquipmentRequest(Model.Name, Model.Category, Model.SerialNumber, Model.Site);
         var result = await EquipmentCatalog.UpdateAsync(Id, request, CallerRole ?? "", db);
-        HandleResult(result);
+        HandleResult(result, "Equipment saved.");
     }
 
     private async Task RetireAsync()
@@ -160,7 +167,7 @@ else
         Error = null;
         await using var db = await DbFactory.CreateDbContextAsync();
         var result = await EquipmentCatalog.RetireAsync(Id, db);
-        HandleResult(result);
+        HandleResult(result, "Equipment retired.");
     }
 
     private async Task ReactivateAsync()
@@ -168,10 +175,10 @@ else
         Error = null;
         await using var db = await DbFactory.CreateDbContextAsync();
         var result = await EquipmentCatalog.ReactivateAsync(Id, db);
-        HandleResult(result);
+        HandleResult(result, "Equipment reactivated.");
     }
 
-    private void HandleResult(EquipmentResult result)
+    private void HandleResult(EquipmentResult result, string successMessage)
     {
         switch (result)
         {
@@ -181,6 +188,7 @@ else
                 Model.Category = success.Equipment.Category;
                 Model.SerialNumber = success.Equipment.SerialNumber;
                 Model.Site = success.Equipment.Site;
+                Toast.Show(successMessage);
                 break;
             case EquipmentResult.UnknownCategory unknown:
                 Error = $"Unknown category: {unknown.Category}";

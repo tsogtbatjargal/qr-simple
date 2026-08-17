@@ -4,28 +4,30 @@
 
 <h1>Add user</h1>
 
-<EditForm Model="Model" OnValidSubmit="SubmitAsync">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+<div class="form-card">
+    <EditForm Model="Model" OnValidSubmit="SubmitAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
 
-    <div>
-        <label>Email <InputText @bind-Value="Model.Email" /></label>
-    </div>
-    <div>
-        <label>
-            Role
-            <InputSelect @bind-Value="Model.Role">
-                <option value="">-- select --</option>
-                @foreach (var role in Roles.All)
-                {
-                    <option value="@role">@role</option>
-                }
-            </InputSelect>
-        </label>
-    </div>
+        <div>
+            <label>Email <InputText @bind-Value="Model.Email" /></label>
+        </div>
+        <div>
+            <label>
+                Role
+                <InputSelect @bind-Value="Model.Role">
+                    <option value="">-- select --</option>
+                    @foreach (var role in Roles.All)
+                    {
+                        <option value="@role">@role</option>
+                    }
+                </InputSelect>
+            </label>
+        </div>
 
-    <button type="submit">Add</button>
-</EditForm>
+        <button type="submit" class="btn btn-primary">Add</button>
+    </EditForm>
+</div>
 
 @if (Error is not null)
 {

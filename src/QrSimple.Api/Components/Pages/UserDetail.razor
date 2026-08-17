@@ -9,35 +9,39 @@
 else
 {
     <h1>@Item.Email</h1>
-    <p>Status: @(Item.IsActive ? "Active" : "Inactive")</p>
+    <p class="status-line">Status: @(Item.IsActive ? "Active" : "Inactive")</p>
 
-    <EditForm Model="Model" OnValidSubmit="SaveRoleAsync">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
+    <div class="form-card">
+        <EditForm Model="Model" OnValidSubmit="SaveRoleAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
 
-        <div>
-            <label>
-                Role
-                <InputSelect @bind-Value="Model.Role">
-                    @foreach (var role in Roles.All)
-                    {
-                        <option value="@role">@role</option>
-                    }
-                </InputSelect>
-            </label>
-        </div>
+            <div>
+                <label>
+                    Role
+                    <InputSelect @bind-Value="Model.Role">
+                        @foreach (var role in Roles.All)
+                        {
+                            <option value="@role">@role</option>
+                        }
+                    </InputSelect>
+                </label>
+            </div>
 
-        <button type="submit">Save role</button>
-    </EditForm>
+            <button type="submit" class="btn btn-primary">Save role</button>
+        </EditForm>
+    </div>
 
-    @if (Item.IsActive)
-    {
-        <button @onclick="DeactivateAsync">Deactivate</button>
-    }
-    else
-    {
-        <button @onclick="ReactivateAsync">Reactivate</button>
-    }
+    <div class="button-row">
+        @if (Item.IsActive)
+        {
+            <button class="btn btn-danger" @onclick="DeactivateAsync">Deactivate</button>
+        }
+        else
+        {
+            <button class="btn btn-primary" @onclick="ReactivateAsync">Reactivate</button>
+        }
+    </div>
 }
 
 @if (Error is not null)

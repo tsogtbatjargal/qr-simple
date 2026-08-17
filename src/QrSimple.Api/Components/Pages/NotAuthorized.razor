@@ -1,9 +1,11 @@
 @page "/app/not-authorized"
 @attribute [Authorize]
 
-<h1>Not authorized</h1>
-<p>Your Google account (@Email) is signed in, but isn't set up in qr-simple yet.</p>
-<p>Ask an admin to add you from the Users page.</p>
+<div class="not-authorized-card">
+    <h1>Not authorized</h1>
+    <p>Your Google account (@Email) is signed in, but isn't set up in qr-simple yet.</p>
+    <p>Ask an admin to add you from the Users page.</p>
+</div>
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }

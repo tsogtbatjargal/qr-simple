@@ -12,33 +12,35 @@ else
 
     @if (CanEditNameAndSerialNumber)
     {
-        <EditForm Model="Model" OnValidSubmit="SaveAsync">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
+        <div class="form-card">
+            <EditForm Model="Model" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
 
-            <div>
-                <label>Name <InputText @bind-Value="Model.Name" /></label>
-            </div>
-            <div>
-                <label>
-                    Category
-                    <InputSelect @bind-Value="Model.Category">
-                        @foreach (var category in Categories!)
-                        {
-                            <option value="@category.Name">@category.Name</option>
-                        }
-                    </InputSelect>
-                </label>
-            </div>
-            <div>
-                <label>Serial number <InputText @bind-Value="Model.SerialNumber" /></label>
-            </div>
-            <div>
-                <label>Site <InputText @bind-Value="Model.Site" /></label>
-            </div>
+                <div>
+                    <label>Name <InputText @bind-Value="Model.Name" /></label>
+                </div>
+                <div>
+                    <label>
+                        Category
+                        <InputSelect @bind-Value="Model.Category">
+                            @foreach (var category in Categories!)
+                            {
+                                <option value="@category.Name">@category.Name</option>
+                            }
+                        </InputSelect>
+                    </label>
+                </div>
+                <div>
+                    <label>Serial number <InputText @bind-Value="Model.SerialNumber" /></label>
+                </div>
+                <div>
+                    <label>Site <InputText @bind-Value="Model.Site" /></label>
+                </div>
 
-            <button type="submit">Save</button>
-        </EditForm>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
     }
     else if (CanEditCategoryAndSite)
     {
@@ -47,27 +49,29 @@ else
             <dd>@Item.SerialNumber</dd>
         </dl>
 
-        <EditForm Model="Model" OnValidSubmit="SaveAsync">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
+        <div class="form-card">
+            <EditForm Model="Model" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
 
-            <div>
-                <label>
-                    Category
-                    <InputSelect @bind-Value="Model.Category">
-                        @foreach (var category in Categories!)
-                        {
-                            <option value="@category.Name">@category.Name</option>
-                        }
-                    </InputSelect>
-                </label>
-            </div>
-            <div>
-                <label>Site <InputText @bind-Value="Model.Site" /></label>
-            </div>
+                <div>
+                    <label>
+                        Category
+                        <InputSelect @bind-Value="Model.Category">
+                            @foreach (var category in Categories!)
+                            {
+                                <option value="@category.Name">@category.Name</option>
+                            }
+                        </InputSelect>
+                    </label>
+                </div>
+                <div>
+                    <label>Site <InputText @bind-Value="Model.Site" /></label>
+                </div>
 
-            <button type="submit">Save</button>
-        </EditForm>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </EditForm>
+        </div>
     }
     else
     {
@@ -81,22 +85,24 @@ else
         </dl>
     }
 
-    <p>Status: @Item.Status</p>
+    <p class="status-line">Status: @Item.Status</p>
 
     @if (CanChangeStatus)
     {
-        @if (Item.Status == EquipmentStatus.Active)
-        {
-            <button @onclick="RetireAsync">Retire</button>
-        }
-        else
-        {
-            <button @onclick="ReactivateAsync">Reactivate</button>
-        }
+        <div class="button-row">
+            @if (Item.Status == EquipmentStatus.Active)
+            {
+                <button class="btn btn-danger" @onclick="RetireAsync">Retire</button>
+            }
+            else
+            {
+                <button class="btn btn-primary" @onclick="ReactivateAsync">Reactivate</button>
+            }
+        </div>
     }
 
-    <img src="/equipment/@Item.Id/qr" alt="QR code for @Item.Name" width="300" height="300" />
-    <p><a href="/e/@Item.Id" target="_blank">Public scan page</a></p>
+    <img class="qr-code" src="/equipment/@Item.Id/qr" alt="QR code for @Item.Name" width="240" height="240" />
+    <p><a href="/e/@Item.Id" target="_blank">Public scan page ↗</a></p>
 }
 
 @if (Error is not null)

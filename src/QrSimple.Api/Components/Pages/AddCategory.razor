@@ -4,16 +4,18 @@
 
 <h1>Add category</h1>
 
-<EditForm Model="Model" OnValidSubmit="SubmitAsync">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+<div class="form-card">
+    <EditForm Model="Model" OnValidSubmit="SubmitAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
 
-    <div>
-        <label>Name <InputText @bind-Value="Model.Name" /></label>
-    </div>
+        <div>
+            <label>Name <InputText @bind-Value="Model.Name" /></label>
+        </div>
 
-    <button type="submit">Add</button>
-</EditForm>
+        <button type="submit" class="btn btn-primary">Add</button>
+    </EditForm>
+</div>
 
 @if (Error is not null)
 {

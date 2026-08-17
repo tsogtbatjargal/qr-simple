@@ -4,7 +4,7 @@
 
 <h1>Equipment</h1>
 
-<p><a href="/app/equipment/add">+ Add equipment</a></p>
+<a class="add-link" href="/app/equipment/add">+ Add equipment</a>
 
 @if (Equipment is null)
 {
@@ -16,29 +16,31 @@ else if (Equipment.Count == 0)
 }
 else
 {
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Serial</th>
-                <th>Site</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in Equipment)
-            {
+    <div class="table-card">
+        <table>
+            <thead>
                 <tr>
-                    <td><a href="/app/equipment/@item.Id">@item.Name</a></td>
-                    <td>@item.Category</td>
-                    <td>@item.SerialNumber</td>
-                    <td>@item.Site</td>
-                    <td>@item.Status</td>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Serial</th>
+                    <th>Site</th>
+                    <th>Status</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var item in Equipment)
+                {
+                    <tr>
+                        <td><a href="/app/equipment/@item.Id">@item.Name</a></td>
+                        <td>@item.Category</td>
+                        <td>@item.SerialNumber</td>
+                        <td>@item.Site</td>
+                        <td>@item.Status</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {

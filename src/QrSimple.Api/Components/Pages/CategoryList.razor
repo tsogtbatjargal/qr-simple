@@ -4,7 +4,7 @@
 
 <h1>Categories</h1>
 
-<p><a href="/app/categories/add">+ Add category</a></p>
+<a class="add-link" href="/app/categories/add">+ Add category</a>
 
 @if (Categories is null)
 {
@@ -16,21 +16,23 @@ else if (Categories.Count == 0)
 }
 else
 {
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in Categories)
-            {
+    <div class="table-card">
+        <table>
+            <thead>
                 <tr>
-                    <td>@item.Name</td>
+                    <th>Name</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var item in Categories)
+                {
+                    <tr>
+                        <td>@item.Name</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {

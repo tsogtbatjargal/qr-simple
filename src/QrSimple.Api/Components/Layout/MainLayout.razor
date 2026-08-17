@@ -2,26 +2,28 @@
 @inject IDbContextFactory<AppDbContext> DbFactory
 
 <div class="page">
-    <header>
-        <a href="/app"><strong>qr-simple</strong></a>
-        <AuthorizeView>
-            <Authorized>
-                @if (IsAdmin)
-                {
-                    <a href="/app/users">Users</a>
-                    <a href="/app/categories">Categories</a>
-                }
-                <span>@context.User.FindFirst(ClaimTypes.Email)?.Value</span>
-                <form method="post" action="/logout">
-                    <button type="submit">Sign out</button>
-                </form>
-            </Authorized>
-            <NotAuthorized>
-                <a href="/login">Sign in with Google</a>
-            </NotAuthorized>
-        </AuthorizeView>
+    <header class="site-header">
+        <a class="brand" href="/app">qr-simple</a>
+        <nav class="nav-links">
+            <AuthorizeView>
+                <Authorized>
+                    @if (IsAdmin)
+                    {
+                        <a href="/app/users">Users</a>
+                        <a href="/app/categories">Categories</a>
+                    }
+                    <span class="user-email">@context.User.FindFirst(ClaimTypes.Email)?.Value</span>
+                    <form method="post" action="/logout" class="signout-form">
+                        <button type="submit" class="btn btn-ghost">Sign out</button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-primary" href="/login">Sign in with Google</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
     </header>
-    <main>
+    <main class="content">
         @Body
     </main>
 </div>

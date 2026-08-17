@@ -113,7 +113,7 @@ else
     <div class="card">
         @if (Photo is not null)
         {
-            <img class="equipment-photo-preview" src="@Photo.Url" alt="@Item.Name" />
+            <img class="equipment-photo-preview" src="@DocumentHref(Photo)" alt="@Item.Name" />
         }
         else
         {
@@ -124,20 +124,20 @@ else
         {
             @if (Photo is null || ShowPhotoForm)
             {
-                <EditForm Model="PhotoModel" OnValidSubmit="SavePhotoAsync">
-                    <DataAnnotationsValidator />
-                    <div>
-                        <label>Photo URL <InputText @bind-Value="PhotoModel.Url" placeholder="https://..." /></label>
-                        <ValidationMessage For="() => PhotoModel.Url" />
-                    </div>
-                    <div class="button-row">
-                        <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Saving..." : "Save photo")</button>
-                        @if (Photo is not null)
-                        {
-                            <button type="button" class="btn btn-ghost-light" @onclick="() => ShowPhotoForm = false">Cancel</button>
-                        }
-                    </div>
-                </EditForm>
+                <div>
+                    <label>Photo file <InputFile @key="PhotoInputKey" OnChange="OnPhotoFileSelected" accept=".jpg,.jpeg,.png,.webp" /></label>
+                    @if (PhotoFileError is not null)
+                    {
+                        <p class="validation-message">@PhotoFileError</p>
+                    }
+                </div>
+                <div class="button-row">
+                    <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedPhotoBytes is null)" @onclick="SavePhotoAsync">@(IsBusy ? "Saving..." : "Save photo")</button>
+                    @if (Photo is not null)
+                    {
+                        <button type="button" class="btn btn-ghost-light" @onclick="CancelPhotoForm">Cancel</button>
+                    }
+                </div>
             }
             else
             {
@@ -173,7 +173,7 @@ else
                     {
                         <tr>
                             <td>@doc.Label</td>
-                            <td><a href="@doc.Url" target="_blank" rel="noopener noreferrer">Open ↗</a></td>
+                            <td><a href="@DocumentHref(doc)" target="_blank" rel="noopener noreferrer">Open ↗</a></td>
                             @if (CanManageDocuments)
                             {
                                 <td><button class="btn btn-danger" disabled="@IsBusy" @onclick="() => RequestDeleteDocument(doc)">Delete</button></td>
@@ -188,21 +188,14 @@ else
     @if (CanManageDocuments)
     {
         <div class="form-card">
-            <EditForm Model="DocModel" OnValidSubmit="AddDocumentAsync">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-
-                <div>
-                    <label>Label <InputText @bind-Value="DocModel.Label" placeholder="User manual" /></label>
-                    <ValidationMessage For="() => DocModel.Label" />
-                </div>
-                <div>
-                    <label>URL <InputText @bind-Value="DocModel.Url" placeholder="https://..." /></label>
-                    <ValidationMessage For="() => DocModel.Url" />
-                </div>
-
-                <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Adding..." : "Add document")</button>
-            </EditForm>
+            <div>
+                <label>Document file <InputFile @key="DocumentInputKey" OnChange="OnDocumentFileSelected" accept=".pdf,.doc,.docx,.xls,.xlsx" /></label>
+                @if (DocumentFileError is not null)
+                {
+                    <p class="validation-message">@DocumentFileError</p>
+                }
+            </div>
+            <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedDocumentBytes is null)" @onclick="AddDocumentAsync">@(IsBusy ? "Adding..." : "Add document")</button>
         </div>
     }
 
@@ -244,10 +237,23 @@ else
     private Document? Photo;
     private List<Document> OtherDocuments => (Documents ?? []).Where(d => d.Id != Photo?.Id).ToList();
     private bool ShowPhotoForm;
-    private readonly PhotoFormModel PhotoModel = new();
-    private readonly AddDocumentModel DocModel = new();
     private ConfirmDialog? DeleteDocConfirm;
     private Document? PendingDelete;
+
+    private Guid PhotoInputKey = Guid.NewGuid();
+    private byte[]? SelectedPhotoBytes;
+    private string? SelectedPhotoContentType;
+    private string? SelectedPhotoFileName;
+    private string? PhotoFileError;
+
+    private Guid DocumentInputKey = Guid.NewGuid();
+    private byte[]? SelectedDocumentBytes;
+    private string? SelectedDocumentContentType;
+    private string? SelectedDocumentFileName;
+    private string? DocumentFileError;
+
+    private static string? DocumentHref(Document document) =>
+        document.Content is not null ? $"/documents/{document.Id}/content" : document.Url;
 
     private bool CanEditNameAndSerialNumber => CallerRole == Roles.Admin;
     private bool CanEditCategoryAndSite => CallerRole == Roles.Operator;
@@ -273,29 +279,65 @@ else
 
             Documents = await DocumentCatalog.ListAsync(Id, db);
             Photo = Documents.FirstOrDefault(d => DocumentCatalog.IsPhotoLabel(d.Label));
-            if (Photo is not null)
-            {
-                PhotoModel.Url = Photo.Url;
-            }
         }
+    }
+
+    private async Task OnPhotoFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        PhotoFileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, isPhoto: true);
+        if (PhotoFileError is not null)
+        {
+            SelectedPhotoBytes = null;
+            return;
+        }
+
+        using var stream = file.OpenReadStream(maxAllowedSize: DocumentUpload.MaxPhotoBytes);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        SelectedPhotoBytes = ms.ToArray();
+        SelectedPhotoContentType = file.ContentType;
+        SelectedPhotoFileName = file.Name;
+    }
+
+    private void CancelPhotoForm()
+    {
+        ShowPhotoForm = false;
+        SelectedPhotoBytes = null;
+        PhotoFileError = null;
+        PhotoInputKey = Guid.NewGuid();
     }
 
     private async Task SavePhotoAsync()
     {
+        if (SelectedPhotoBytes is null)
+        {
+            return;
+        }
+
         Error = null;
         IsBusy = true;
 
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
-            var result = await DocumentCatalog.SetPhotoAsync(Id, PhotoModel.Url, db);
+            var result = await DocumentCatalog.SetPhotoUploadAsync(
+                Id, SelectedPhotoBytes, SelectedPhotoContentType!, SelectedPhotoFileName!, db);
             switch (result)
             {
                 case DocumentResult.Success success:
                     Photo = success.Document;
                     Documents = [.. (Documents ?? []).Where(d => d.Id != success.Document.Id), success.Document];
                     ShowPhotoForm = false;
+                    SelectedPhotoBytes = null;
+                    SelectedPhotoContentType = null;
+                    SelectedPhotoFileName = null;
+                    PhotoInputKey = Guid.NewGuid();
                     Toast.Success("Photo saved.");
+                    break;
+                case DocumentResult.InvalidFile invalid:
+                    Error = invalid.Reason;
+                    Toast.Error(Error);
                     break;
                 default:
                     Error = "Could not save photo.";
@@ -309,30 +351,57 @@ else
         }
     }
 
-    private async Task AddDocumentAsync()
+    private async Task OnDocumentFileSelected(InputFileChangeEventArgs e)
     {
-        Error = null;
-
-        if (DocumentCatalog.IsPhotoLabel(DocModel.Label))
+        var file = e.File;
+        DocumentFileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, isPhoto: false);
+        if (DocumentFileError is null && DocumentCatalog.IsPhotoLabel(Path.GetFileNameWithoutExtension(file.Name)))
         {
-            Error = "Use the Photo section above to set the equipment photo.";
-            Toast.Error(Error);
+            DocumentFileError = "That file name is reserved for the equipment photo. Rename the file, or use the Photo section above.";
+        }
+
+        if (DocumentFileError is not null)
+        {
+            SelectedDocumentBytes = null;
             return;
         }
 
+        using var stream = file.OpenReadStream(maxAllowedSize: DocumentUpload.MaxDocumentBytes);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        SelectedDocumentBytes = ms.ToArray();
+        SelectedDocumentContentType = file.ContentType;
+        SelectedDocumentFileName = file.Name;
+    }
+
+    private async Task AddDocumentAsync()
+    {
+        if (SelectedDocumentBytes is null)
+        {
+            return;
+        }
+
+        Error = null;
         IsBusy = true;
 
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
-            var result = await DocumentCatalog.AddAsync(Id, DocModel.Label, DocModel.Url, db);
+            var result = await DocumentCatalog.AddUploadAsync(
+                Id, null, SelectedDocumentBytes, SelectedDocumentContentType!, SelectedDocumentFileName!, db);
             switch (result)
             {
                 case DocumentResult.Success success:
                     Documents = [.. Documents ?? [], success.Document];
-                    DocModel.Label = "";
-                    DocModel.Url = "";
+                    SelectedDocumentBytes = null;
+                    SelectedDocumentContentType = null;
+                    SelectedDocumentFileName = null;
+                    DocumentInputKey = Guid.NewGuid();
                     Toast.Success("Document added.");
+                    break;
+                case DocumentResult.InvalidFile invalid:
+                    Error = invalid.Reason;
+                    Toast.Error(Error);
                     break;
                 default:
                     Error = "Could not add document.";
@@ -378,7 +447,8 @@ else
                     if (Photo?.Id == success.Document.Id)
                     {
                         Photo = null;
-                        PhotoModel.Url = "";
+                        SelectedPhotoBytes = null;
+                        PhotoInputKey = Guid.NewGuid();
                     }
                     Toast.Success("Document deleted.");
                     break;
@@ -487,22 +557,5 @@ else
 
         [Required]
         public string Site { get; set; } = "";
-    }
-
-    private sealed class PhotoFormModel
-    {
-        [Required]
-        [Url]
-        public string Url { get; set; } = "";
-    }
-
-    private sealed class AddDocumentModel
-    {
-        [Required]
-        public string Label { get; set; } = "";
-
-        [Required]
-        [Url]
-        public string Url { get; set; } = "";
     }
 }

@@ -107,15 +107,32 @@ public class RoleGatingTests(ApiFactory factory) : IClassFixture<ApiFactory>
             site = "North Pit",
         });
         var equipment = await created.Content.ReadFromJsonAsync<CreatedEquipment>();
-        var addDocResponse = await operatorClient.PostAsJsonAsync($"/equipment/{equipment!.Id}/documents", new
-        {
-            label = "User Manual",
-            url = "https://docs.example.com/dg-0001-manual.pdf",
-        });
+        using var docContent = TestUploads.Document(label: "User Manual");
+        var addDocResponse = await operatorClient.PostAsync($"/equipment/{equipment!.Id}/documents", docContent);
         var document = await addDocResponse.Content.ReadFromJsonAsync<CreatedDocument>();
 
         var readerClient = factory.CreateClientAs("Reader");
         var response = await readerClient.DeleteAsync($"/equipment/{equipment.Id}/documents/{document!.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reader_cannot_upload_an_equipment_document()
+    {
+        var operatorClient = factory.CreateClientAs("Operator");
+        var created = await operatorClient.PostAsJsonAsync("/equipment", new
+        {
+            name = "Upload Guarded Truck",
+            category = "Truck",
+            serialNumber = "UG-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        var readerClient = factory.CreateClientAs("Reader");
+        using var docContent = TestUploads.Document(label: "User Manual");
+        var response = await readerClient.PostAsync($"/equipment/{equipment!.Id}/documents", docContent);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

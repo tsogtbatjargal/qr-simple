@@ -13,8 +13,8 @@ A durable pointer (`/e/{id}`) printed on a label and attached to a piece of Equi
 _Avoid_: Token, tag ID (the QR *is* the pointer, not a one-time credential)
 
 **Document**:
-A labeled external link (e.g. "User Manual", "Safety Data Sheet") attached to a piece of Equipment for the "more details" flow. Points to wherever the file already lives (SharePoint, Google Drive, etc.) — v1 does not host files itself.
-_Avoid_: File, attachment (implies we store the bytes, which we don't in v1)
+A labeled file (e.g. "User Manual", "Safety Data Sheet", or the equipment photo) attached to a piece of Equipment for the "more details" flow. Uploaded directly and stored as bytes in Postgres — v1 hosts the file itself rather than linking out to wherever it already lives. The data model keeps room for a URL-based link mode alongside the upload fields for a possible future phase, but nothing in the app creates a URL-based Document today.
+_Avoid_: External link, hosted-elsewhere (v1 stores the bytes, it doesn't point elsewhere)
 
 **Organization**:
 The tenant boundary. Every Equipment and User belongs to exactly one Organization. Modeled from day one even though v1 only ever has a single Organization, so future multi-company support doesn't require a schema migration.

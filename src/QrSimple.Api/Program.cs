@@ -135,17 +135,28 @@ app.MapGet("/e/{id}", async (Guid id, AppDbContext db) =>
     return Results.Content(ScanPage.Render(equipment, documents), "text/html");
 });
 
-app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest request, AppDbContext db) =>
+app.MapPost("/equipment/{id}/documents", async (Guid id, IFormFile file, HttpRequest request, AppDbContext db) =>
 {
-    var result = await DocumentCatalog.AddAsync(id, request.Label, request.Url, db);
+    var label = request.Form["label"].ToString();
+    await using var stream = file.OpenReadStream();
+    using var ms = new MemoryStream();
+    await stream.CopyToAsync(ms);
+
+    var result = await DocumentCatalog.AddUploadAsync(id, label, ms.ToArray(), file.ContentType, file.FileName, db);
     return result.ToHttpResult(document => Results.Created($"/equipment/{id}/documents/{document.Id}", document));
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
+}).DisableAntiforgery().RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.MapDelete("/equipment/{id}/documents/{documentId}", async (Guid id, Guid documentId, AppDbContext db) =>
 {
     var result = await DocumentCatalog.DeleteAsync(documentId, db);
     return result.ToHttpResult(_ => Results.NoContent());
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
+
+app.MapGet("/documents/{id}/content", async (Guid id, AppDbContext db) =>
+{
+    var result = await DocumentCatalog.GetContentAsync(id, db);
+    return result.ToHttpResult(document => Results.File(document.Content!, document.ContentType ?? "application/octet-stream"));
+});
 
 app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, ClaimsPrincipal principal, AppDbContext db) =>
 {
@@ -252,7 +263,6 @@ app.MapPost("/equipment/import", async (IFormFile file, AppDbContext db, HttpReq
 app.Run();
 
 public record CreateEquipmentRequest(string Name, string Category, string SerialNumber, string Site);
-record AddDocumentRequest(string Label, string Url);
 record AddCategoryRequest(string Name);
 record AddUserRequest(string Email, string Role);
 record UpdateUserRoleRequest(string Role);

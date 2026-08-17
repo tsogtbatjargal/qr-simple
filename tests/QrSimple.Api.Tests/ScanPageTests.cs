@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace QrSimple.Api.Tests;
 
@@ -69,18 +70,16 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         });
         var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
 
-        var addDocResponse = await client.PostAsJsonAsync($"/equipment/{created!.Id}/documents", new
-        {
-            label = "User Manual",
-            url = "https://docs.example.com/ex-0004-manual.pdf",
-        });
+        using var docContent = TestUploads.Document(label: "User Manual");
+        var addDocResponse = await client.PostAsync($"/equipment/{created!.Id}/documents", docContent);
         Assert.True(addDocResponse.IsSuccessStatusCode);
+        var document = await addDocResponse.Content.ReadFromJsonAsync<CreatedDocument>();
 
         var scanResponse = await client.GetAsync($"/e/{created.Id}");
         var html = await scanResponse.Content.ReadAsStringAsync();
 
         Assert.Contains("User Manual", html);
-        Assert.Contains("https://docs.example.com/ex-0004-manual.pdf", html);
+        Assert.Contains($"/documents/{document!.Id}/content", html);
         Assert.Contains("class=\"panel document\"", html);
         Assert.Contains("target=\"_blank\"", html);
     }
@@ -99,25 +98,24 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         });
         var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
 
-        await client.PostAsJsonAsync($"/equipment/{created!.Id}/documents", new
+        Document photo;
+        using (var scope = factory.Services.CreateScope())
         {
-            label = "Equipment Photo",
-            url = "https://images.example.com/pum-0032.png",
-        });
-        await client.PostAsJsonAsync($"/equipment/{created.Id}/documents", new
-        {
-            label = "Maintenance instruction",
-            url = "https://docs.example.com/pum-0032-maintenance.pdf",
-        });
-        await client.PostAsJsonAsync($"/equipment/{created.Id}/documents", new
-        {
-            label = "User manual",
-            url = "https://docs.example.com/pum-0032-manual.pdf",
-        });
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var result = await DocumentCatalog.SetPhotoUploadAsync(
+                created!.Id, TestUploads.TinyPngBytes, "image/png", "pump-32.png", db);
+            photo = ((DocumentResult.Success)result).Document;
+        }
+
+        using var maintenanceContent = TestUploads.Document(fileName: "maintenance.pdf", label: "Maintenance instruction");
+        await client.PostAsync($"/equipment/{created.Id}/documents", maintenanceContent);
+
+        using var manualContent = TestUploads.Document(fileName: "manual.pdf", label: "User manual");
+        await client.PostAsync($"/equipment/{created.Id}/documents", manualContent);
 
         var html = await client.GetStringAsync($"/e/{created.Id}");
 
-        Assert.Contains("<img src=\"https://images.example.com/pum-0032.png\"", html);
+        Assert.Contains($"<img src=\"/documents/{photo.Id}/content\"", html);
         Assert.Contains("alt=\"Pump 32\"", html);
         Assert.DoesNotContain(">Equipment Photo</a>", html);
         Assert.Contains("Maintenance instruction", html);
@@ -165,11 +163,8 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         });
         var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
 
-        var addDocResponse = await client.PostAsJsonAsync($"/equipment/{created!.Id}/documents", new
-        {
-            label = "User Manual",
-            url = "https://docs.example.com/ld-0009-manual.pdf",
-        });
+        using var docContent = TestUploads.Document(label: "User Manual");
+        var addDocResponse = await client.PostAsync($"/equipment/{created!.Id}/documents", docContent);
         var document = await addDocResponse.Content.ReadFromJsonAsync<CreatedDocument>();
 
         var deleteResponse = await client.DeleteAsync($"/equipment/{created.Id}/documents/{document!.Id}");

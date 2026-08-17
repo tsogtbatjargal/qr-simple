@@ -16,9 +16,11 @@ public static class ScanPage
             ? """<div class="retired" role="status">This equipment is no longer in service.</div>"""
             : "";
 
-        var equipmentImage = photo is not null
-            ? $"""<img src="{Encode(photo.Url)}" alt="{Encode(equipment.Name)}">"""
-            : """
+        var equipmentImage = photo switch
+        {
+            { Content: not null } => $"""<img src="/documents/{photo.Id}/content" alt="{Encode(equipment.Name)}">""",
+            { Url: not null } => $"""<img src="{Encode(photo.Url)}" alt="{Encode(equipment.Name)}">""",
+            _ => """
                 <svg class="placeholder" viewBox="0 0 240 150" role="img" aria-label="Equipment image not available">
                     <rect x="24" y="71" width="125" height="48" rx="10" fill="currentColor" opacity=".2"/>
                     <circle cx="64" cy="125" r="18" fill="currentColor"/>
@@ -26,7 +28,8 @@ public static class ScanPage
                     <path d="M149 82h26l26 24v13h-52zM37 70l24-31h60l19 31z" fill="currentColor"/>
                     <path d="M166 44h13v40h-13zM158 35h30v13h-30z" fill="currentColor" opacity=".75"/>
                 </svg>
-                """;
+                """,
+        };
 
         var documentLinks = string.Concat(documents
             .Where(document => document != photo)
@@ -35,11 +38,14 @@ public static class ScanPage
                 : 2)
             .ThenBy(document => document.Label)
             .Select(document =>
-                $"""
-                <a class="panel document" href="{Encode(document.Url)}" target="_blank" rel="noopener noreferrer">
-                    <span>{Encode(document.Label)}</span><span class="arrow" aria-hidden="true">↗</span>
-                </a>
-                """));
+            {
+                var href = document.Content is not null ? $"/documents/{document.Id}/content" : document.Url;
+                return $"""
+                    <a class="panel document" href="{Encode(href ?? "")}" target="_blank" rel="noopener noreferrer">
+                        <span>{Encode(document.Label)}</span><span class="arrow" aria-hidden="true">↗</span>
+                    </a>
+                    """;
+            }));
 
         var documentsSection = documentLinks.Length > 0
             ? $"""<nav class="documents" aria-label="Equipment documents">{documentLinks}</nav>"""

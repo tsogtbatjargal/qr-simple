@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace QrSimple.Api.Tests;
 
@@ -138,22 +139,23 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         });
         var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
 
-        await client.PostAsJsonAsync($"/equipment/{equipment!.Id}/documents", new
+        Document photo;
+        using (var scope = factory.Services.CreateScope())
         {
-            label = "Equipment Photo",
-            url = "https://images.example.com/doc-0001.png",
-        });
-        await client.PostAsJsonAsync($"/equipment/{equipment.Id}/documents", new
-        {
-            label = "User manual",
-            url = "https://docs.example.com/doc-0001-manual.pdf",
-        });
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var result = await DocumentCatalog.SetPhotoUploadAsync(
+                equipment!.Id, TestUploads.TinyPngBytes, "image/png", "doc-0001.png", db);
+            photo = ((DocumentResult.Success)result).Document;
+        }
+
+        using var docContent = TestUploads.Document(label: "User manual");
+        await client.PostAsync($"/equipment/{equipment!.Id}/documents", docContent);
 
         var response = await client.GetAsync($"/app/equipment/{equipment.Id}");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Contains("Photo", body);
-        Assert.Contains("https://images.example.com/doc-0001.png", body);
+        Assert.Contains($"/documents/{photo.Id}/content", body);
         Assert.Contains("User manual", body);
         Assert.Contains("Add document", body);
     }
@@ -171,11 +173,8 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         });
         var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
 
-        await adminClient.PostAsJsonAsync($"/equipment/{equipment!.Id}/documents", new
-        {
-            label = "User manual",
-            url = "https://docs.example.com/rvt-0001-manual.pdf",
-        });
+        using var docContent = TestUploads.Document(label: "User manual");
+        await adminClient.PostAsync($"/equipment/{equipment!.Id}/documents", docContent);
 
         var readerClient = factory.CreateClientAs("Reader");
         var response = await readerClient.GetAsync($"/app/equipment/{equipment.Id}");
@@ -183,6 +182,7 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Contains("User manual", body);
         Assert.DoesNotContain("Add document", body);
+        Assert.DoesNotContain("type=\"file\"", body);
     }
 
     private sealed record EquipmentResponse(Guid Id);

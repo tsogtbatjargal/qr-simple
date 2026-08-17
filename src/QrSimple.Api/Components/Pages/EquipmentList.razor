@@ -6,11 +6,11 @@
 
 <a class="add-link" href="/app/equipment/add">+ Add equipment</a>
 
-@if (Equipment is null)
+@if (AllEquipment is null)
 {
     <p>Loading...</p>
 }
-else if (Equipment.Count == 0)
+else if (AllEquipment.Count == 0)
 {
     <p>No equipment yet.</p>
 }
@@ -18,7 +18,8 @@ else
 {
     <div class="table-controls">
         <input class="search-input" type="search" placeholder="Search equipment..." @bind="SearchText" @bind:event="oninput" />
-        <span class="result-count">@Visible.Count of @Equipment.Count</span>
+        <label class="checkbox-label"><input type="checkbox" @bind="ShowRetired" /> Show retired</label>
+        <span class="result-count">@Visible.Count of @BaseVisible.Count</span>
     </div>
 
     <div class="table-card">
@@ -50,16 +51,26 @@ else
 
 @code {
     protected override string[] AllowedRoles => [Roles.Admin, Roles.Operator, Roles.Reader];
-    private List<Equipment>? Equipment;
+
+    // Loaded once including retired equipment so the "Show retired" toggle is instant
+    // (no extra DB round-trip) — it also lets the count on CategoryDetail's "used by N
+    // equipment" line be cross-checked against something visible in this UI, which was
+    // not possible before this toggle existed.
+    private List<Equipment>? AllEquipment;
     private string SearchText = "";
+    private bool ShowRetired;
     private string SortColumn = "Name";
     private bool SortAscending = true;
 
-    private List<Equipment> Visible => Sort(Filter(Equipment ?? []));
+    private List<Equipment> BaseVisible => ShowRetired
+        ? AllEquipment ?? []
+        : (AllEquipment ?? []).Where(e => e.Status == EquipmentStatus.Active).ToList();
+
+    private List<Equipment> Visible => Sort(Filter(BaseVisible));
 
     protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
     {
-        Equipment = await EquipmentCatalog.ListAsync(includeRetired: false, db);
+        AllEquipment = await EquipmentCatalog.ListAsync(includeRetired: true, db);
     }
 
     private List<Equipment> Filter(List<Equipment> source)

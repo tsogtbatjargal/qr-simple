@@ -121,6 +121,7 @@ a:hover { color: var(--blue-dark); }
 .table-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .search-input { max-width: 280px; margin: 0; }
 .table-controls .result-count { color: var(--muted); font-size: .85rem; }
+.checkbox-label { display: flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); font-weight: 600; margin: 0; }
 
 th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--blue-dark); }

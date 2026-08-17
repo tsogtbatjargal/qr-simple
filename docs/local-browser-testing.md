@@ -144,13 +144,27 @@ compound `kill && dotnet run &` is prone to the `nohup`'d process silently never
 
 ## What the application displays
 
-`qr-simple` is primarily a minimal API, not a general frontend application. `/categories` returns JSON. The public rendered scan page is:
+`qr-simple` has two rendered surfaces plus plain JSON routes. `/categories` (and most other non-`/app` routes) returns JSON with no UI.
+
+The public scan page, styled directly in `src/QrSimple.Api/ScanPage.cs` (no external stylesheet — the `<style>` block is inline in that file):
 
 ```text
 http://127.0.0.1:5078/e/{equipment-id}
 ```
 
-An Equipment record must exist before that page can be tested. QR images are also generated through API routes; consult `src/QrSimple.Api/Program.cs` and the HTTP integration tests for the current route shapes.
+An Equipment record must exist before that page can be tested.
+
+The Blazor Server admin UI at `/app` (requires the `https` launch profile and a signed-in, authorized session — see the sign-in section above) is styled via `src/QrSimple.Api/wwwroot/app.css`, which deliberately reuses `ScanPage.cs`'s exact design tokens (`#356fbd` blue, `#eef3fa` background, 14px card radius, same shadow formulas) so the two surfaces read as one product. If you're checking that a UI change actually applied, verify with `browser_evaluate`/computed styles rather than assuming the stylesheet loaded — Blazor requires `app.MapStaticAssets()` in `Program.cs`, not `UseStaticFiles()`, to serve `wwwroot` in a published build.
+
+QR images are also generated through API routes; consult `src/QrSimple.Api/Program.cs` and the HTTP integration tests for the current route shapes.
+
+### Playwright MCP screenshots
+
+`scripts/start-playwright-mcp-service.sh` passes `--image-responses allow`, so `browser_take_screenshot` returns the PNG inline in the tool response by default — it renders directly in the conversation, no filesystem access needed. That flag exists because, over this HTTP-transport MCP connection, the default `imageResponses: auto` setting doesn't reliably detect that the client can display images, and silently drops the image data, leaving only a markdown link to a file — which used to be a dead end (see below), so don't remove the flag.
+
+For the underlying file (full-page/large screenshots may also get scaled down in the inline response, and `browser_navigate`'s automatic accessibility snapshot is file-only, no inline form) the script also passes `--output-dir /output`, bind-mounted from `.playwright-mcp-output/` *inside the repo* (`:Z` suffix — see the script's comments for why plain `chmod 777` wasn't enough on this SELinux-enforcing Fedora host). Because the whole repo is already the devcontainer's workspace mount, files written there are visible from both a Fedora host terminal and the devcontainer at the same relative path — no `.devcontainer/devcontainer.json` change or rebuild needed. That directory is gitignored; treat its contents as disposable.
+
+One caveat: passing an explicit `filename` to `browser_take_screenshot` currently resolves against the wrong base path in this setup and fails with `ENOENT` on a host path that doesn't exist inside the container — omit `filename` and let it auto-generate a timestamped one instead.
 
 ## Troubleshooting
 
@@ -190,6 +204,7 @@ This was a Flatpak-to-host Podman event race. `scripts/podman-for-vscode.sh` add
 - `.codex/config.toml` — project-scoped HTTP MCP registration.
 - `scripts/start-chrome-for-playwright.sh` — one host command for the database, MCP service, and disposable Chrome.
 - `scripts/start-playwright-mcp-service.sh` — Playwright MCP Podman service definition.
+- `.playwright-mcp-output/` — gitignored; screenshots/PDFs/videos/snapshots written by the Playwright MCP service, readable from host and devcontainer alike.
 - `.devcontainer/devcontainer.json` — host networking and Podman socket setup.
 - `scripts/podman-for-vscode.sh` — Flatpak VS Code to host Podman bridge and event-race fix.
 

@@ -1,2 +1,3 @@
 bin/
 obj/
+.playwright-mcp-output/

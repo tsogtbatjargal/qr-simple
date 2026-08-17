@@ -8,6 +8,8 @@
 }
 else
 {
+    <Breadcrumbs Items="@(new() { new("Equipment", "/app"), new(Item.Name) })" />
+
     <h1>@Item.Name</h1>
 
     @if (CanEditNameAndSerialNumber)
@@ -19,6 +21,7 @@ else
 
                 <div>
                     <label>Name <InputText @bind-Value="Model.Name" /></label>
+                    <ValidationMessage For="() => Model.Name" />
                 </div>
                 <div>
                     <label>
@@ -30,15 +33,18 @@ else
                             }
                         </InputSelect>
                     </label>
+                    <ValidationMessage For="() => Model.Category" />
                 </div>
                 <div>
                     <label>Serial number <InputText @bind-Value="Model.SerialNumber" /></label>
+                    <ValidationMessage For="() => Model.SerialNumber" />
                 </div>
                 <div>
                     <label>Site <InputText @bind-Value="Model.Site" /></label>
+                    <ValidationMessage For="() => Model.Site" />
                 </div>
 
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Saving..." : "Save")</button>
             </EditForm>
         </div>
     }
@@ -64,12 +70,14 @@ else
                             }
                         </InputSelect>
                     </label>
+                    <ValidationMessage For="() => Model.Category" />
                 </div>
                 <div>
                     <label>Site <InputText @bind-Value="Model.Site" /></label>
+                    <ValidationMessage For="() => Model.Site" />
                 </div>
 
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Saving..." : "Save")</button>
             </EditForm>
         </div>
     }
@@ -92,11 +100,11 @@ else
         <div class="button-row">
             @if (Item.Status == EquipmentStatus.Active)
             {
-                <button class="btn btn-danger" @onclick="() => RetireConfirm!.Show()">Retire</button>
+                <button class="btn btn-danger" disabled="@IsBusy" @onclick="() => RetireConfirm!.Show()">Retire</button>
             }
             else
             {
-                <button class="btn btn-primary" @onclick="ReactivateAsync">Reactivate</button>
+                <button class="btn btn-primary" disabled="@IsBusy" @onclick="ReactivateAsync">@(IsBusy ? "Reactivating..." : "Reactivate")</button>
             }
         </div>
     }
@@ -116,8 +124,6 @@ else
     <p class="error">@Error</p>
 }
 
-<p><a href="/app">Back to list</a></p>
-
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -129,6 +135,7 @@ else
     private string? Error;
     private string? CallerRole;
     private ConfirmDialog? RetireConfirm;
+    private bool IsBusy;
 
     private bool CanEditNameAndSerialNumber => CallerRole == Roles.Admin;
     private bool CanEditCategoryAndSite => CallerRole == Roles.Operator;
@@ -156,26 +163,53 @@ else
     private async Task SaveAsync()
     {
         Error = null;
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var request = new CreateEquipmentRequest(Model.Name, Model.Category, Model.SerialNumber, Model.Site);
-        var result = await EquipmentCatalog.UpdateAsync(Id, request, CallerRole ?? "", db);
-        HandleResult(result, "Equipment saved.");
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var request = new CreateEquipmentRequest(Model.Name, Model.Category, Model.SerialNumber, Model.Site);
+            var result = await EquipmentCatalog.UpdateAsync(Id, request, CallerRole ?? "", db);
+            HandleResult(result, "Equipment saved.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task RetireAsync()
     {
         Error = null;
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var result = await EquipmentCatalog.RetireAsync(Id, db);
-        HandleResult(result, "Equipment retired.");
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await EquipmentCatalog.RetireAsync(Id, db);
+            HandleResult(result, "Equipment retired.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task ReactivateAsync()
     {
         Error = null;
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var result = await EquipmentCatalog.ReactivateAsync(Id, db);
-        HandleResult(result, "Equipment reactivated.");
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await EquipmentCatalog.ReactivateAsync(Id, db);
+            HandleResult(result, "Equipment reactivated.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private void HandleResult(EquipmentResult result, string successMessage)
@@ -188,16 +222,19 @@ else
                 Model.Category = success.Equipment.Category;
                 Model.SerialNumber = success.Equipment.SerialNumber;
                 Model.Site = success.Equipment.Site;
-                Toast.Show(successMessage);
+                Toast.Success(successMessage);
                 break;
             case EquipmentResult.UnknownCategory unknown:
                 Error = $"Unknown category: {unknown.Category}";
+                Toast.Error(Error);
                 break;
             case EquipmentResult.RestrictedFieldEdit:
                 Error = "Operators can only edit Category and Site.";
+                Toast.Error(Error);
                 break;
             default:
                 Error = "Could not update equipment.";
+                Toast.Error(Error);
                 break;
         }
     }

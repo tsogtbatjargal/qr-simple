@@ -27,7 +27,7 @@ else
                 @foreach (var item in Categories)
                 {
                     <tr>
-                        <td>@item.Name</td>
+                        <td><a href="/app/categories/@item.Id">@item.Name</a></td>
                     </tr>
                 }
             </tbody>

@@ -1,0 +1,147 @@
+@page "/app/categories/{Id:guid}"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+@if (Item is null)
+{
+    <p>Category not found.</p>
+}
+else
+{
+    <Breadcrumbs Items="@(new() { new("Categories", "/app/categories"), new(Item.Name) })" />
+
+    <h1>@Item.Name</h1>
+    <p class="status-line">
+        @(EquipmentCount == 0 ? "Not used by any equipment." : $"Used by {EquipmentCount} equipment record(s).")
+    </p>
+
+    <div class="form-card">
+        <EditForm Model="Model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div>
+                <label>Name <InputText @bind-Value="Model.Name" /></label>
+                <ValidationMessage For="() => Model.Name" />
+            </div>
+
+            <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Saving..." : "Save")</button>
+        </EditForm>
+    </div>
+
+    <div class="button-row">
+        <button class="btn btn-danger" disabled="@(IsBusy || EquipmentCount > 0)" @onclick="() => DeleteConfirm!.Show()">Delete</button>
+    </div>
+    @if (EquipmentCount > 0)
+    {
+        <p class="status-line">Reassign or retire those equipment records before deleting this category.</p>
+    }
+
+    <ConfirmDialog @ref="DeleteConfirm"
+                    Title="Delete this category?"
+                    Message="@($"\"{Item.Name}\" will be permanently removed. This cannot be undone.")"
+                    ConfirmText="Delete"
+                    OnConfirmed="DeleteAsync" />
+}
+
+@if (Error is not null)
+{
+    <p class="error">@Error</p>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    protected override string[] AllowedRoles => [Roles.Admin];
+
+    private Category? Item;
+    private int EquipmentCount;
+    private readonly EditCategoryModel Model = new();
+    private string? Error;
+    private ConfirmDialog? DeleteConfirm;
+    private bool IsBusy;
+
+    protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
+    {
+        Item = await db.Categories.FindAsync(Id);
+        if (Item is not null)
+        {
+            Model.Name = Item.Name;
+            EquipmentCount = await db.Equipment.CountAsync(e => e.Category == Item.Name);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await CategoryCatalog.RenameAsync(Id, Model.Name, db);
+            HandleResult(result, "Category saved.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await CategoryCatalog.DeleteAsync(Id, db);
+            switch (result)
+            {
+                case CategoryResult.Success:
+                    Toast.Success("Category deleted.");
+                    Navigation.NavigateTo("/app/categories");
+                    break;
+                case CategoryResult.InUse inUse:
+                    Error = $"{inUse.EquipmentCount} equipment record(s) still use this category.";
+                    Toast.Error(Error);
+                    break;
+                default:
+                    Error = "Could not delete category.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void HandleResult(CategoryResult result, string successMessage)
+    {
+        switch (result)
+        {
+            case CategoryResult.Success success:
+                Item = success.Category;
+                Model.Name = success.Category.Name;
+                Toast.Success(successMessage);
+                break;
+            case CategoryResult.DuplicateName dup:
+                Error = $"A category named \"{dup.Name}\" already exists.";
+                Toast.Error(Error);
+                break;
+            default:
+                Error = "Could not update category.";
+                Toast.Error(Error);
+                break;
+        }
+    }
+
+    private sealed class EditCategoryModel
+    {
+        [Required]
+        public string Name { get; set; } = "";
+    }
+}

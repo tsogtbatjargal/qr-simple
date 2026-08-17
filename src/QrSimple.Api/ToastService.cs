@@ -1,8 +1,15 @@
 namespace QrSimple.Api;
 
+public enum ToastKind
+{
+    Success,
+    Error,
+}
+
 public sealed class ToastService
 {
-    public event Action<string>? OnShow;
+    public event Action<string, ToastKind>? OnShow;
 
-    public void Show(string message) => OnShow?.Invoke(message);
+    public void Success(string message) => OnShow?.Invoke(message, ToastKind.Success);
+    public void Error(string message) => OnShow?.Invoke(message, ToastKind.Error);
 }

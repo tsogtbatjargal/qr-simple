@@ -185,6 +185,18 @@ app.MapPost("/categories", async (AddCategoryRequest request, AppDbContext db) =
 app.MapGet("/categories", async (AppDbContext db) =>
     Results.Ok(await db.Categories.ToListAsync()));
 
+app.MapPut("/categories/{id}", async (Guid id, AddCategoryRequest request, AppDbContext db) =>
+{
+    var result = await CategoryCatalog.RenameAsync(id, request.Name, db);
+    return result.ToHttpResult(Results.Ok);
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
+
+app.MapDelete("/categories/{id}", async (Guid id, AppDbContext db) =>
+{
+    var result = await CategoryCatalog.DeleteAsync(id, db);
+    return result.ToHttpResult(_ => Results.NoContent());
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
+
 app.MapGet("/me", async (ClaimsPrincipal principal, AppDbContext db) =>
 {
     var email = principal.FindFirstValue(ClaimTypes.Email);

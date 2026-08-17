@@ -2,6 +2,8 @@
 @attribute [Authorize]
 @inherits RoleGatedComponentBase
 
+<Breadcrumbs Items="@(new() { new("Users", "/app/users"), new("Add user") })" />
+
 <h1>Add user</h1>
 
 <div class="form-card">
@@ -11,6 +13,7 @@
 
         <div>
             <label>Email <InputText @bind-Value="Model.Email" /></label>
+            <ValidationMessage For="() => Model.Email" />
         </div>
         <div>
             <label>
@@ -23,9 +26,10 @@
                     }
                 </InputSelect>
             </label>
+            <ValidationMessage For="() => Model.Role" />
         </div>
 
-        <button type="submit" class="btn btn-primary">Add</button>
+        <button type="submit" class="btn btn-primary" disabled="@IsSaving">@(IsSaving ? "Adding..." : "Add")</button>
     </EditForm>
 </div>
 
@@ -34,36 +38,46 @@
     <p class="error">@Error</p>
 }
 
-<p><a href="/app/users">Back to users</a></p>
-
 @code {
     protected override string[] AllowedRoles => [Roles.Admin];
 
     private readonly AddUserModel Model = new();
     private string? Error;
+    private bool IsSaving;
 
     private async Task SubmitAsync()
     {
         Error = null;
+        IsSaving = true;
 
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var result = await UserCatalog.CreateAsync(Model.Email, Model.Role, db);
-
-        switch (result)
+        try
         {
-            case UserResult.Success success:
-                Toast.Show("User added.");
-                Navigation.NavigateTo($"/app/users/{success.User.Id}");
-                break;
-            case UserResult.DuplicateEmail dup:
-                Error = $"A user with email {dup.Email} already exists.";
-                break;
-            case UserResult.UnknownRole unknown:
-                Error = $"Unknown role: {unknown.Role}";
-                break;
-            default:
-                Error = "Could not add user.";
-                break;
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await UserCatalog.CreateAsync(Model.Email, Model.Role, db);
+
+            switch (result)
+            {
+                case UserResult.Success success:
+                    Toast.Success("User added.");
+                    Navigation.NavigateTo($"/app/users/{success.User.Id}");
+                    break;
+                case UserResult.DuplicateEmail dup:
+                    Error = $"A user with email {dup.Email} already exists.";
+                    Toast.Error(Error);
+                    break;
+                case UserResult.UnknownRole unknown:
+                    Error = $"Unknown role: {unknown.Role}";
+                    Toast.Error(Error);
+                    break;
+                default:
+                    Error = "Could not add user.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsSaving = false;
         }
     }
 

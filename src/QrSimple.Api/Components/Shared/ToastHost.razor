@@ -4,7 +4,7 @@
 <div class="toast-host">
     @foreach (var toast in Toasts)
     {
-        <div class="toast" @key="toast.Id">@toast.Message</div>
+        <div class="toast @(toast.Kind == ToastKind.Error ? "toast-error" : "toast-success")" @key="toast.Id">@toast.Message</div>
     }
 </div>
 
@@ -17,9 +17,9 @@
         Toast.OnShow += HandleShow;
     }
 
-    private void HandleShow(string message)
+    private void HandleShow(string message, ToastKind kind)
     {
-        var item = new ToastItem(_nextId++, message);
+        var item = new ToastItem(_nextId++, message, kind);
         Toasts.Add(item);
         _ = InvokeAsync(StateHasChanged);
         _ = DismissAfterDelayAsync(item);
@@ -37,5 +37,5 @@
         Toast.OnShow -= HandleShow;
     }
 
-    private sealed record ToastItem(int Id, string Message);
+    private sealed record ToastItem(int Id, string Message, ToastKind Kind);
 }

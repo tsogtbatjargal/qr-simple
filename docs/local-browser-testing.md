@@ -166,6 +166,10 @@ For the underlying file (full-page/large screenshots may also get scaled down in
 
 One caveat: passing an explicit `filename` to `browser_take_screenshot` currently resolves against the wrong base path in this setup and fails with `ENOENT` on a host path that doesn't exist inside the container — omit `filename` and let it auto-generate a timestamped one instead.
 
+### `browser_evaluate` polling loops can lie about elapsed time
+
+If you're verifying a client-side timer (e.g. a toast auto-dismissing after N milliseconds) by running a `setTimeout`-based polling loop inside `browser_evaluate` and comparing your loop's own iteration count to the real delay, don't trust it. The disposable-profile Chrome tab driven by this Playwright setup can have its JS timers throttled (backgrounded-tab-style deprioritization) even while nominally "active," so a loop doing `await sleep(200)` ten times does not reliably mean 2000ms actually elapsed — it can silently take much longer in wall-clock time while still reporting the same iteration count. This produced a false "the timer fired 5x too early" alarm once (`ToastHost`'s 3.5s dismiss looked like it fired at ~700ms). The fix was adding real server-side `Console.WriteLine(DateTime.UtcNow)` timestamps around the actual timer (`Task.Delay` runs server-side in Blazor Server, unaffected by browser tab throttling) and reading those from the `dotnet run` log instead of trusting the browser-side loop's own clock. If a client-side timing test looks wrong by a suspiciously large margin, suspect the measurement (browser timer throttling) before the code.
+
 ## Troubleshooting
 
 ### Codex lists Playwright but exposes no browser tools

@@ -16,19 +16,24 @@ else if (Equipment.Count == 0)
 }
 else
 {
+    <div class="table-controls">
+        <input class="search-input" type="search" placeholder="Search equipment..." @bind="SearchText" @bind:event="oninput" />
+        <span class="result-count">@Visible.Count of @Equipment.Count</span>
+    </div>
+
     <div class="table-card">
         <table>
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Serial</th>
-                    <th>Site</th>
-                    <th>Status</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Name"))">Name@(SortArrow("Name"))</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Category"))">Category@(SortArrow("Category"))</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Serial"))">Serial@(SortArrow("Serial"))</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Site"))">Site@(SortArrow("Site"))</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Status"))">Status@(SortArrow("Status"))</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var item in Equipment)
+                @foreach (var item in Visible)
                 {
                     <tr>
                         <td><a href="/app/equipment/@item.Id">@item.Name</a></td>
@@ -46,9 +51,61 @@ else
 @code {
     protected override string[] AllowedRoles => [Roles.Admin, Roles.Operator, Roles.Reader];
     private List<Equipment>? Equipment;
+    private string SearchText = "";
+    private string SortColumn = "Name";
+    private bool SortAscending = true;
+
+    private List<Equipment> Visible => Sort(Filter(Equipment ?? []));
 
     protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
     {
         Equipment = await EquipmentCatalog.ListAsync(includeRetired: false, db);
     }
+
+    private List<Equipment> Filter(List<Equipment> source)
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            return source;
+        }
+
+        var term = SearchText.Trim();
+        return source.Where(e =>
+            e.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+            e.Category.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+            e.SerialNumber.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+            e.Site.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    private List<Equipment> Sort(List<Equipment> source)
+    {
+        Func<Equipment, string> key = SortColumn switch
+        {
+            "Category" => e => e.Category,
+            "Serial" => e => e.SerialNumber,
+            "Site" => e => e.Site,
+            "Status" => e => e.Status.ToString(),
+            _ => e => e.Name,
+        };
+
+        return SortAscending
+            ? source.OrderBy(key, StringComparer.OrdinalIgnoreCase).ToList()
+            : source.OrderByDescending(key, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private void SetSort(string column)
+    {
+        if (SortColumn == column)
+        {
+            SortAscending = !SortAscending;
+        }
+        else
+        {
+            SortColumn = column;
+            SortAscending = true;
+        }
+    }
+
+    private string SortArrow(string column) =>
+        SortColumn != column ? "" : SortAscending ? " ▲" : " ▼";
 }

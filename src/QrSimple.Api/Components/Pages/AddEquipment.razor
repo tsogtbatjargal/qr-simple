@@ -2,6 +2,8 @@
 @attribute [Authorize]
 @inherits RoleGatedComponentBase
 
+<Breadcrumbs Items="@(new() { new("Equipment", "/app"), new("Add equipment") })" />
+
 <h1>Add equipment</h1>
 
 @if (Categories is not null && Categories.Count == 0)
@@ -16,6 +18,7 @@
 
         <div>
             <label>Name <InputText @bind-Value="Model.Name" /></label>
+            <ValidationMessage For="() => Model.Name" />
         </div>
         <div>
             <label>
@@ -31,15 +34,18 @@
                     }
                 </InputSelect>
             </label>
+            <ValidationMessage For="() => Model.Category" />
         </div>
         <div>
             <label>Serial number <InputText @bind-Value="Model.SerialNumber" /></label>
+            <ValidationMessage For="() => Model.SerialNumber" />
         </div>
         <div>
             <label>Site <InputText @bind-Value="Model.Site" /></label>
+            <ValidationMessage For="() => Model.Site" />
         </div>
 
-        <button type="submit" class="btn btn-primary">Add</button>
+        <button type="submit" class="btn btn-primary" disabled="@IsSaving">@(IsSaving ? "Adding..." : "Add")</button>
     </EditForm>
 </div>
 
@@ -54,6 +60,7 @@
     private List<Category>? Categories;
     private readonly AddEquipmentModel Model = new();
     private string? Error;
+    private bool IsSaving;
 
     protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
     {
@@ -63,23 +70,33 @@
     private async Task SubmitAsync()
     {
         Error = null;
+        IsSaving = true;
 
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var request = new CreateEquipmentRequest(Model.Name, Model.Category, Model.SerialNumber, Model.Site);
-        var result = await EquipmentCatalog.CreateAsync(request, db);
-
-        switch (result)
+        try
         {
-            case EquipmentResult.Success success:
-                Toast.Show("Equipment added.");
-                Navigation.NavigateTo($"/app/equipment/{success.Equipment.Id}");
-                break;
-            case EquipmentResult.UnknownCategory unknown:
-                Error = $"Unknown category: {unknown.Category}";
-                break;
-            default:
-                Error = "Could not add equipment.";
-                break;
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var request = new CreateEquipmentRequest(Model.Name, Model.Category, Model.SerialNumber, Model.Site);
+            var result = await EquipmentCatalog.CreateAsync(request, db);
+
+            switch (result)
+            {
+                case EquipmentResult.Success success:
+                    Toast.Success("Equipment added.");
+                    Navigation.NavigateTo($"/app/equipment/{success.Equipment.Id}");
+                    break;
+                case EquipmentResult.UnknownCategory unknown:
+                    Error = $"Unknown category: {unknown.Category}";
+                    Toast.Error(Error);
+                    break;
+                default:
+                    Error = "Could not add equipment.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsSaving = false;
         }
     }
 

@@ -8,6 +8,8 @@
 }
 else
 {
+    <Breadcrumbs Items="@(new() { new("Users", "/app/users"), new(Item.Email) })" />
+
     <h1>@Item.Email</h1>
     <p class="status-line">Status: @(Item.IsActive ? "Active" : "Inactive")</p>
 
@@ -26,20 +28,21 @@ else
                         }
                     </InputSelect>
                 </label>
+                <ValidationMessage For="() => Model.Role" />
             </div>
 
-            <button type="submit" class="btn btn-primary">Save role</button>
+            <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Saving..." : "Save role")</button>
         </EditForm>
     </div>
 
     <div class="button-row">
         @if (Item.IsActive)
         {
-            <button class="btn btn-danger" @onclick="() => DeactivateConfirm!.Show()">Deactivate</button>
+            <button class="btn btn-danger" disabled="@IsBusy" @onclick="() => DeactivateConfirm!.Show()">Deactivate</button>
         }
         else
         {
-            <button class="btn btn-primary" @onclick="ReactivateAsync">Reactivate</button>
+            <button class="btn btn-primary" disabled="@IsBusy" @onclick="ReactivateAsync">@(IsBusy ? "Reactivating..." : "Reactivate")</button>
         }
     </div>
 
@@ -55,8 +58,6 @@ else
     <p class="error">@Error</p>
 }
 
-<p><a href="/app/users">Back to users</a></p>
-
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -67,6 +68,7 @@ else
     private string? Error;
     private string? CallerEmail;
     private ConfirmDialog? DeactivateConfirm;
+    private bool IsBusy;
 
     protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
     {
@@ -83,25 +85,52 @@ else
     private async Task SaveRoleAsync()
     {
         Error = null;
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var result = await UserCatalog.UpdateRoleAsync(Id, Model.Role, db);
-        HandleResult(result, "Role saved.");
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await UserCatalog.UpdateRoleAsync(Id, Model.Role, db);
+            HandleResult(result, "Role saved.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task DeactivateAsync()
     {
         Error = null;
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var result = await UserCatalog.DeactivateAsync(Id, CallerEmail, db);
-        HandleResult(result, "User deactivated.");
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await UserCatalog.DeactivateAsync(Id, CallerEmail, db);
+            HandleResult(result, "User deactivated.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task ReactivateAsync()
     {
         Error = null;
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var result = await UserCatalog.ReactivateAsync(Id, db);
-        HandleResult(result, "User reactivated.");
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await UserCatalog.ReactivateAsync(Id, db);
+            HandleResult(result, "User reactivated.");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private void HandleResult(UserResult result, string successMessage)
@@ -111,19 +140,23 @@ else
             case UserResult.Success success:
                 Item = success.User;
                 Model.Role = success.User.Role;
-                Toast.Show(successMessage);
+                Toast.Success(successMessage);
                 break;
             case UserResult.LastAdminProtected:
                 Error = "Cannot remove the last remaining Admin.";
+                Toast.Error(Error);
                 break;
             case UserResult.SelfLockoutBlocked:
                 Error = "You cannot deactivate your own account.";
+                Toast.Error(Error);
                 break;
             case UserResult.UnknownRole unknown:
                 Error = $"Unknown role: {unknown.Role}";
+                Toast.Error(Error);
                 break;
             default:
                 Error = "Could not update user.";
+                Toast.Error(Error);
                 break;
         }
     }

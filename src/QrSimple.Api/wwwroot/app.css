@@ -102,6 +102,30 @@ a:hover { color: var(--blue-dark); }
 
 .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+.btn:disabled { opacity: .6; cursor: not-allowed; transform: none !important; box-shadow: none; }
+
+.breadcrumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: .85rem;
+    color: var(--muted);
+    margin: 0 0 10px;
+}
+.breadcrumbs a { color: var(--muted); text-decoration: none; font-weight: 600; }
+.breadcrumbs a:hover { color: var(--blue); text-decoration: underline; }
+.breadcrumbs .sep { opacity: .5; }
+.breadcrumbs .current { color: var(--text); font-weight: 600; }
+
+.table-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.search-input { max-width: 280px; margin: 0; }
+.table-controls .result-count { color: var(--muted); font-size: .85rem; }
+
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--blue-dark); }
+th.sortable .sort-arrow { margin-left: 4px; opacity: .7; display: inline-block; }
+
 .add-link {
     display: inline-block;
     margin-bottom: 20px;
@@ -149,6 +173,15 @@ input:focus, select:focus {
     outline: none;
     border-color: var(--blue);
     box-shadow: 0 0 0 3px rgb(53 111 189 / 15%);
+}
+
+/* Matches the :not() chain's specificity above so this actually wins the cascade instead of
+   silently losing to the base border-color despite the .invalid class being present. */
+input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid, select.invalid {
+    border-color: var(--danger);
+}
+input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid:focus, select.invalid:focus {
+    box-shadow: 0 0 0 3px rgb(180 35 24 / 15%);
 }
 
 .validation-message { display: block; color: var(--danger); font-size: .85rem; margin-top: 4px; }
@@ -246,6 +279,9 @@ dd { margin: 0; overflow-wrap: anywhere; }
     animation: toast-in .2s ease;
 }
 
+.toast-success { background: var(--text); }
+.toast-error { background: var(--danger); }
+
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
@@ -262,4 +298,5 @@ dd { margin: 0; overflow-wrap: anywhere; }
     .toast { text-align: center; }
     .modal-actions { flex-direction: column-reverse; }
     .modal-actions .btn { width: 100%; }
+    .search-input { max-width: none; width: 100%; }
 }

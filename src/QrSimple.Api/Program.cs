@@ -137,24 +137,14 @@ app.MapGet("/e/{id}", async (Guid id, AppDbContext db) =>
 
 app.MapPost("/equipment/{id}/documents", async (Guid id, AddDocumentRequest request, AppDbContext db) =>
 {
-    var equipment = await db.Equipment.FindAsync(id);
-    if (equipment is null)
-    {
-        return Results.NotFound();
-    }
+    var result = await DocumentCatalog.AddAsync(id, request.Label, request.Url, db);
+    return result.ToHttpResult(document => Results.Created($"/equipment/{id}/documents/{document.Id}", document));
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
-    var document = new Document
-    {
-        Id = Guid.NewGuid(),
-        EquipmentId = id,
-        Label = request.Label,
-        Url = request.Url,
-    };
-
-    db.Documents.Add(document);
-    await db.SaveChangesAsync();
-
-    return Results.Created($"/equipment/{id}/documents/{document.Id}", document);
+app.MapDelete("/equipment/{id}/documents/{documentId}", async (Guid id, Guid documentId, AppDbContext db) =>
+{
+    var result = await DocumentCatalog.DeleteAsync(documentId, db);
+    return result.ToHttpResult(_ => Results.NoContent());
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.MapPut("/equipment/{id}", async (Guid id, CreateEquipmentRequest request, ClaimsPrincipal principal, AppDbContext db) =>

@@ -58,7 +58,6 @@ public static class ScanPage
             .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: #356fbd; color: white; text-align: center; box-shadow: 0 6px 18px rgb(28 68 123 / 15%); }
             h1 { margin: 0; font-size: clamp(1.55rem, 6vw, 2.25rem); line-height: 1.15; font-weight: 700; }
             .category { font-size: clamp(1.25rem, 5vw, 1.75rem); font-weight: 600; }
-            .category small { display: block; margin-right: .5rem; opacity: .8; font-size: .7em; font-weight: 500; }
             .documents { display: grid; gap: 14px; }
             .document { position: relative; padding-inline: 52px; font-size: clamp(1.2rem, 5vw, 1.65rem); font-weight: 600; text-decoration: none; transition: transform .15s ease, background .15s ease; }
             .document:hover { background: #285da3; transform: translateY(-1px); }
@@ -97,7 +96,7 @@ public static class ScanPage
                             <div class="photo-frame">{equipmentImage}</div>
                         </section>
                         <section class="panel"><h1>{Encode(equipment.Name)}</h1></section>
-                        <section class="panel category"><small>Category</small>{Encode(equipment.Category)}</section>
+                        <section class="panel category">{Encode(equipment.Category)}</section>
                         {retiredNotice}
                         {documentsSection}
                     </div>

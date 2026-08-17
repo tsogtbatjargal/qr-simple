@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 
 namespace QrSimple.Api.Tests;
@@ -150,5 +151,44 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.DoesNotContain("no longer in service", html, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Deleting_a_document_removes_it_from_the_scan_page()
+    {
+        var client = factory.CreateClientAs("Operator");
+
+        var createResponse = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Loader 9",
+            category = "Loader",
+            serialNumber = "LD-0009",
+            site = "West Bench",
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        var addDocResponse = await client.PostAsJsonAsync($"/equipment/{created!.Id}/documents", new
+        {
+            label = "User Manual",
+            url = "https://docs.example.com/ld-0009-manual.pdf",
+        });
+        var document = await addDocResponse.Content.ReadFromJsonAsync<CreatedDocument>();
+
+        var deleteResponse = await client.DeleteAsync($"/equipment/{created.Id}/documents/{document!.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var html = await client.GetStringAsync($"/e/{created.Id}");
+        Assert.DoesNotContain("User Manual", html);
+    }
+
+    [Fact]
+    public async Task Deleting_an_unknown_document_returns_not_found()
+    {
+        var client = factory.CreateClientAs("Operator");
+
+        var response = await client.DeleteAsync($"/equipment/{Guid.NewGuid()}/documents/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private sealed record CreatedEquipment(Guid Id);
+    private sealed record CreatedDocument(Guid Id);
 }

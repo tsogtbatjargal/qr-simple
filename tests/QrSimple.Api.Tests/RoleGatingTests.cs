@@ -95,5 +95,31 @@ public class RoleGatingTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.True(reactivateResponse.IsSuccessStatusCode);
     }
 
+    [Fact]
+    public async Task Reader_cannot_delete_an_equipment_document()
+    {
+        var operatorClient = factory.CreateClientAs("Operator");
+        var created = await operatorClient.PostAsJsonAsync("/equipment", new
+        {
+            name = "Document Guarded Truck",
+            category = "Truck",
+            serialNumber = "DG-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<CreatedEquipment>();
+        var addDocResponse = await operatorClient.PostAsJsonAsync($"/equipment/{equipment!.Id}/documents", new
+        {
+            label = "User Manual",
+            url = "https://docs.example.com/dg-0001-manual.pdf",
+        });
+        var document = await addDocResponse.Content.ReadFromJsonAsync<CreatedDocument>();
+
+        var readerClient = factory.CreateClientAs("Reader");
+        var response = await readerClient.DeleteAsync($"/equipment/{equipment.Id}/documents/{document!.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private sealed record CreatedEquipment(Guid Id);
+    private sealed record CreatedDocument(Guid Id);
 }

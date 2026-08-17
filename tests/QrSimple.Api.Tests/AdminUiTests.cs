@@ -125,5 +125,65 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Contains("Site", body);
     }
 
+    [Fact]
+    public async Task Equipment_detail_page_shows_photo_and_documents_sections()
+    {
+        var client = factory.CreateClientAs("Admin");
+        var created = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Documented Truck",
+            category = "Truck",
+            serialNumber = "DOC-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
+
+        await client.PostAsJsonAsync($"/equipment/{equipment!.Id}/documents", new
+        {
+            label = "Equipment Photo",
+            url = "https://images.example.com/doc-0001.png",
+        });
+        await client.PostAsJsonAsync($"/equipment/{equipment.Id}/documents", new
+        {
+            label = "User manual",
+            url = "https://docs.example.com/doc-0001-manual.pdf",
+        });
+
+        var response = await client.GetAsync($"/app/equipment/{equipment.Id}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Photo", body);
+        Assert.Contains("https://images.example.com/doc-0001.png", body);
+        Assert.Contains("User manual", body);
+        Assert.Contains("Add document", body);
+    }
+
+    [Fact]
+    public async Task Reader_sees_documents_but_no_manage_controls_on_equipment_detail_page()
+    {
+        var adminClient = factory.CreateClientAs("Admin");
+        var created = await adminClient.PostAsJsonAsync("/equipment", new
+        {
+            name = "Reader View Truck",
+            category = "Truck",
+            serialNumber = "RVT-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
+
+        await adminClient.PostAsJsonAsync($"/equipment/{equipment!.Id}/documents", new
+        {
+            label = "User manual",
+            url = "https://docs.example.com/rvt-0001-manual.pdf",
+        });
+
+        var readerClient = factory.CreateClientAs("Reader");
+        var response = await readerClient.GetAsync($"/app/equipment/{equipment.Id}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("User manual", body);
+        Assert.DoesNotContain("Add document", body);
+    }
+
     private sealed record EquipmentResponse(Guid Id);
 }

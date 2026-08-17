@@ -109,6 +109,103 @@ else
         </div>
     }
 
+    <h2>Photo</h2>
+    <div class="card">
+        @if (Photo is not null)
+        {
+            <img class="equipment-photo-preview" src="@Photo.Url" alt="@Item.Name" />
+        }
+        else
+        {
+            <p class="status-line">No photo set.</p>
+        }
+
+        @if (CanManageDocuments)
+        {
+            @if (Photo is null || ShowPhotoForm)
+            {
+                <EditForm Model="PhotoModel" OnValidSubmit="SavePhotoAsync">
+                    <DataAnnotationsValidator />
+                    <div>
+                        <label>Photo URL <InputText @bind-Value="PhotoModel.Url" placeholder="https://..." /></label>
+                        <ValidationMessage For="() => PhotoModel.Url" />
+                    </div>
+                    <div class="button-row">
+                        <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Saving..." : "Save photo")</button>
+                        @if (Photo is not null)
+                        {
+                            <button type="button" class="btn btn-ghost-light" @onclick="() => ShowPhotoForm = false">Cancel</button>
+                        }
+                    </div>
+                </EditForm>
+            }
+            else
+            {
+                <div class="button-row">
+                    <button class="btn btn-ghost-light" @onclick="() => ShowPhotoForm = true">Replace</button>
+                    <button class="btn btn-danger" disabled="@IsBusy" @onclick="() => RequestDeleteDocument(Photo)">Remove</button>
+                </div>
+            }
+        }
+    </div>
+
+    <h2>Documents</h2>
+    @if (OtherDocuments.Count == 0)
+    {
+        <p>No documents yet.</p>
+    }
+    else
+    {
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Label</th>
+                        <th>Link</th>
+                        @if (CanManageDocuments)
+                        {
+                            <th></th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var doc in OtherDocuments)
+                    {
+                        <tr>
+                            <td>@doc.Label</td>
+                            <td><a href="@doc.Url" target="_blank" rel="noopener noreferrer">Open ↗</a></td>
+                            @if (CanManageDocuments)
+                            {
+                                <td><button class="btn btn-danger" disabled="@IsBusy" @onclick="() => RequestDeleteDocument(doc)">Delete</button></td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (CanManageDocuments)
+    {
+        <div class="form-card">
+            <EditForm Model="DocModel" OnValidSubmit="AddDocumentAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div>
+                    <label>Label <InputText @bind-Value="DocModel.Label" placeholder="User manual" /></label>
+                    <ValidationMessage For="() => DocModel.Label" />
+                </div>
+                <div>
+                    <label>URL <InputText @bind-Value="DocModel.Url" placeholder="https://..." /></label>
+                    <ValidationMessage For="() => DocModel.Url" />
+                </div>
+
+                <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Adding..." : "Add document")</button>
+            </EditForm>
+        </div>
+    }
+
     <img class="qr-code" src="/equipment/@Item.Id/qr" alt="QR code for @Item.Name" width="240" height="240" />
     <p><a href="/e/@Item.Id" target="_blank">Public scan page ↗</a></p>
 
@@ -117,6 +214,12 @@ else
                     Message="@($"\"{Item.Name}\" will be marked retired and hidden from the active equipment list.")"
                     ConfirmText="Retire"
                     OnConfirmed="RetireAsync" />
+
+    <ConfirmDialog @ref="DeleteDocConfirm"
+                    Title="@(PendingDelete is not null && Photo?.Id == PendingDelete.Id ? "Remove this photo?" : "Delete this document?")"
+                    Message="@($"\"{PendingDelete?.Label}\" will be permanently removed.")"
+                    ConfirmText="Delete"
+                    OnConfirmed="DeleteDocumentAsync" />
 }
 
 @if (Error is not null)
@@ -137,9 +240,19 @@ else
     private ConfirmDialog? RetireConfirm;
     private bool IsBusy;
 
+    private List<Document>? Documents;
+    private Document? Photo;
+    private List<Document> OtherDocuments => (Documents ?? []).Where(d => d.Id != Photo?.Id).ToList();
+    private bool ShowPhotoForm;
+    private readonly PhotoFormModel PhotoModel = new();
+    private readonly AddDocumentModel DocModel = new();
+    private ConfirmDialog? DeleteDocConfirm;
+    private Document? PendingDelete;
+
     private bool CanEditNameAndSerialNumber => CallerRole == Roles.Admin;
     private bool CanEditCategoryAndSite => CallerRole == Roles.Operator;
     private bool CanChangeStatus => CallerRole == Roles.Admin;
+    private bool CanManageDocuments => CallerRole == Roles.Admin || CallerRole == Roles.Operator;
 
     protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
     {
@@ -157,6 +270,128 @@ else
             Model.Category = Item.Category;
             Model.SerialNumber = Item.SerialNumber;
             Model.Site = Item.Site;
+
+            Documents = await DocumentCatalog.ListAsync(Id, db);
+            Photo = Documents.FirstOrDefault(d => DocumentCatalog.IsPhotoLabel(d.Label));
+            if (Photo is not null)
+            {
+                PhotoModel.Url = Photo.Url;
+            }
+        }
+    }
+
+    private async Task SavePhotoAsync()
+    {
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await DocumentCatalog.SetPhotoAsync(Id, PhotoModel.Url, db);
+            switch (result)
+            {
+                case DocumentResult.Success success:
+                    Photo = success.Document;
+                    Documents = [.. (Documents ?? []).Where(d => d.Id != success.Document.Id), success.Document];
+                    ShowPhotoForm = false;
+                    Toast.Success("Photo saved.");
+                    break;
+                default:
+                    Error = "Could not save photo.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task AddDocumentAsync()
+    {
+        Error = null;
+
+        if (DocumentCatalog.IsPhotoLabel(DocModel.Label))
+        {
+            Error = "Use the Photo section above to set the equipment photo.";
+            Toast.Error(Error);
+            return;
+        }
+
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await DocumentCatalog.AddAsync(Id, DocModel.Label, DocModel.Url, db);
+            switch (result)
+            {
+                case DocumentResult.Success success:
+                    Documents = [.. Documents ?? [], success.Document];
+                    DocModel.Label = "";
+                    DocModel.Url = "";
+                    Toast.Success("Document added.");
+                    break;
+                default:
+                    Error = "Could not add document.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void RequestDeleteDocument(Document? document)
+    {
+        if (document is null)
+        {
+            return;
+        }
+
+        PendingDelete = document;
+        DeleteDocConfirm!.Show();
+    }
+
+    private async Task DeleteDocumentAsync()
+    {
+        if (PendingDelete is null)
+        {
+            return;
+        }
+
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await DocumentCatalog.DeleteAsync(PendingDelete.Id, db);
+            switch (result)
+            {
+                case DocumentResult.Success success:
+                    Documents = (Documents ?? []).Where(d => d.Id != success.Document.Id).ToList();
+                    if (Photo?.Id == success.Document.Id)
+                    {
+                        Photo = null;
+                        PhotoModel.Url = "";
+                    }
+                    Toast.Success("Document deleted.");
+                    break;
+                default:
+                    Error = "Could not delete document.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+            PendingDelete = null;
         }
     }
 
@@ -252,5 +487,22 @@ else
 
         [Required]
         public string Site { get; set; } = "";
+    }
+
+    private sealed class PhotoFormModel
+    {
+        [Required]
+        [Url]
+        public string Url { get; set; } = "";
+    }
+
+    private sealed class AddDocumentModel
+    {
+        [Required]
+        public string Label { get; set; } = "";
+
+        [Required]
+        [Url]
+        public string Url { get; set; } = "";
     }
 }

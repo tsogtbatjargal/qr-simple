@@ -117,6 +117,17 @@ curl -X POST http://localhost:5078/users \
 
 Then run with `--launch-profile https` and sign in at `https://localhost:7040`.
 
+## 7. Adding more testers later
+
+Every new tester needs **two separate, manual additions** — there's no API to link them, and skipping either one fails differently:
+
+1. **Google Cloud Console → APIs & Services → Google Auth Platform → Audience tab → Test users.** While the OAuth consent screen is in "Testing" publishing status (the default from `setup-google-oauth.sh`), only emails on this list (max 100) can complete Google sign-in at all — everyone else is blocked before ever reaching the app. This is Console-UI-only; there's no public API for it (the IAP-brand APIs are unrelated and don't apply here, and were shut down in March 2026 regardless). A test user's grant also expires 7 days after consent — a re-consent prompt later isn't a bug.
+2. **The app's own `Users` table** (`/app/users` in the admin UI, once an Admin exists). This is what actually authorizes them inside the app (Admin/Operator/Reader) — a signed-in identity with no `Users` row lands on "Not authorized".
+
+If every tester shares one Google Workspace domain **and** the GCP project belongs to that org, switching the consent screen's User Type from External to Internal (same Audience tab) removes step 1's per-email requirement entirely — anyone in the org can sign in. Personal Gmail testers don't have this option; add them one at a time.
+
+**Or skip the allowlist entirely: publish to production.** Google Cloud Console → APIs & Services → Google Auth Platform → Audience tab → **Publish App**. Since this app only requests basic scopes (`email`/`profile`/`openid`), this needs no verification review and is free — the confirm dialog completes immediately. Nothing in the codebase changes (same Client ID/Secret/redirect URI). Consequences: any Google account can now reach sign-in (still gated by qr-simple's own `Users` table for authorization — an unlisted signer just lands on "Not authorized"), and every signer sees an "unverified app" click-through warning until/unless you also do the optional, free brand verification (adds your logo/app name to the consent screen). Reversible from the same Audience page.
+
 ## Optional: live browser testing / agent MCP tooling
 
 Only needed for live Playwright-driven browser verification or running the

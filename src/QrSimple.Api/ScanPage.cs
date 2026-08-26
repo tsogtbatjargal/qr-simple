@@ -54,20 +54,22 @@ public static class ScanPage
         const string styles = """
             :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
             * { box-sizing: border-box; }
-            body { margin: 0; background: #eef3fa; color: #14213d; }
+            body { margin: 0; background: #f7f9fc; color: #14213d; }
             main { width: min(100%, 760px); min-height: 100vh; margin: 0 auto; padding: clamp(12px, 3vw, 24px); }
+            .brand-mark { display: flex; align-items: center; gap: 10px; padding: 4px 2px 14px; }
+            .brand-mark img { height: 24px; width: auto; display: block; }
             .stack { display: grid; gap: 14px; }
-            .photo { min-height: 220px; display: grid; place-items: center; padding: 18px; background: #356fbd; border-radius: 18px; box-shadow: 0 8px 24px rgb(28 68 123 / 18%); }
+            .photo { min-height: 220px; display: grid; place-items: center; padding: 18px; background: #166fc0; border-radius: 18px; box-shadow: 0 8px 24px rgb(22 111 192 / 18%); }
             .photo-frame { width: min(100%, 340px); aspect-ratio: 16 / 10; display: grid; place-items: center; overflow: hidden; background: white; border-radius: 12px; }
             .photo img { width: 100%; height: 100%; object-fit: contain; }
-            .placeholder { width: 74%; max-height: 78%; color: #356fbd; }
-            .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: #356fbd; color: white; text-align: center; box-shadow: 0 6px 18px rgb(28 68 123 / 15%); }
+            .placeholder { width: 74%; max-height: 78%; color: #166fc0; }
+            .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: #166fc0; color: white; text-align: center; box-shadow: 0 6px 18px rgb(22 111 192 / 15%); }
             h1 { margin: 0; font-size: clamp(1.55rem, 6vw, 2.25rem); line-height: 1.15; font-weight: 700; }
             .category { font-size: clamp(1.25rem, 5vw, 1.75rem); font-weight: 600; }
             .documents { display: grid; gap: 14px; }
             .document { position: relative; padding-inline: 52px; font-size: clamp(1.2rem, 5vw, 1.65rem); font-weight: 600; text-decoration: none; transition: transform .15s ease, background .15s ease; }
-            .document:hover { background: #285da3; transform: translateY(-1px); }
-            .document:focus-visible { outline: 4px solid #f5b700; outline-offset: 3px; }
+            .document:hover { background: #125a9c; transform: translateY(-1px); }
+            .document:focus-visible { outline: 4px solid #ff7a1a; outline-offset: 3px; }
             .arrow { position: absolute; right: 24px; font-size: 1.2em; }
             .retired { padding: 16px 20px; border: 2px solid #b42318; border-radius: 12px; background: #fff1f0; color: #8a1c13; text-align: center; font-weight: 700; }
             .details { margin-top: 22px; padding: 22px; border-radius: 14px; background: white; box-shadow: 0 6px 18px rgb(28 68 123 / 9%); }
@@ -93,10 +95,12 @@ public static class ScanPage
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>{Encode(equipment.Name)}</title>
+                <link rel="icon" type="image/png" sizes="32x32" href="/brand/logos/favicon-32.png">
                 <style>{styles}</style>
             </head>
             <body>
                 <main>
+                    <div class="brand-mark"><img src="/brand/logos/ics-logo.png" alt="ICS Mongolia"></div>
                     <div class="stack">
                         <section class="photo" aria-label="Equipment photo">
                             <div class="photo-frame">{equipmentImage}</div>

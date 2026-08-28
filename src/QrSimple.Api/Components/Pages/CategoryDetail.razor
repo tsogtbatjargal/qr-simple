@@ -25,12 +25,12 @@ else
                 <ValidationMessage For="() => Model.Name" />
             </div>
 
-            <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Saving..." : "Save")</button>
+            <button type="submit" class="btn btn-primary" disabled="@IsBusy"><Icon Name="check-circle" />@(IsBusy ? "Saving..." : "Save")</button>
         </EditForm>
     </div>
 
     <div class="button-row">
-        <button class="btn btn-danger" disabled="@(IsBusy || EquipmentCount > 0)" @onclick="() => DeleteConfirm!.Show()">Delete</button>
+        <button class="btn btn-danger" disabled="@(IsBusy || EquipmentCount > 0)" @onclick="() => DeleteConfirm!.Show()"><Icon Name="trash-2" />Delete</button>
     </div>
     @if (EquipmentCount > 0)
     {
@@ -46,7 +46,7 @@ else
 
 @if (Error is not null)
 {
-    <p class="error">@Error</p>
+    <p class="error"><Icon Name="x-circle" />@Error</p>
 }
 
 @code {

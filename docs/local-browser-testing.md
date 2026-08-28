@@ -154,7 +154,7 @@ http://127.0.0.1:5078/e/{equipment-id}
 
 An Equipment record must exist before that page can be tested.
 
-The Blazor Server admin UI at `/app` (requires the `https` launch profile and a signed-in, authorized session — see the sign-in section above) is styled via `src/QrSimple.Api/wwwroot/app.css`, which deliberately reuses `ScanPage.cs`'s exact design tokens (`#356fbd` blue, `#eef3fa` background, 14px card radius, same shadow formulas) so the two surfaces read as one product. If you're checking that a UI change actually applied, verify with `browser_evaluate`/computed styles rather than assuming the stylesheet loaded — Blazor requires `app.MapStaticAssets()` in `Program.cs`, not `UseStaticFiles()`, to serve `wwwroot` in a published build.
+The Blazor Server admin UI at `/app` (requires the `https` launch profile and a signed-in, authorized session — see the sign-in section above) is styled via `src/QrSimple.Api/wwwroot/app.css`, which deliberately reuses `ScanPage.cs`'s exact design tokens — as of 2026-08-28 both surfaces link `wwwroot/brand/tokens.css` (ICS brand blue `#156FC1`, `#f4f8fd` background, 14px card radius, shared shadow tokens, self-hosted Inter) rather than duplicating literal values, so the two surfaces read as one product. If you're checking that a UI change actually applied, verify with `browser_evaluate`/computed styles rather than assuming the stylesheet loaded — Blazor requires `app.MapStaticAssets()` in `Program.cs`, not `UseStaticFiles()`, to serve `wwwroot` in a published build.
 
 QR images are also generated through API routes; consult `src/QrSimple.Api/Program.cs` and the HTTP integration tests for the current route shapes.
 

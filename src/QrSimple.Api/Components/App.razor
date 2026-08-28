@@ -3,13 +3,17 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>qr-simple admin</title>
+    <title>ICS Equipment Registry</title>
     <base href="/" />
-    <link rel="icon" type="image/png" sizes="32x32" href="brand/logos/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="brand/logos/favicon-192.png" />
-    <link rel="apple-touch-icon" href="brand/logos/apple-touch-icon.png" />
+    <meta name="theme-color" content="#156fc1" />
+    @* tokens.css carries both the brand palette and the self-hosted Inter
+       @font-face rules, so it must load before app.css, which consumes them. *@
     <link rel="stylesheet" href="brand/tokens.css" />
     <link rel="stylesheet" href="app.css" />
+    <link rel="icon" type="image/png" sizes="32x32" href="brand/logos/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="brand/logos/favicon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="brand/logos/favicon-512.png" />
+    <link rel="apple-touch-icon" href="brand/logos/apple-touch-icon.png" />
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 <body>

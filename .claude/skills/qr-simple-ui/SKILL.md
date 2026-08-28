@@ -9,7 +9,7 @@ Full environment setup, sign-in, and troubleshooting: `docs/local-browser-testin
 
 ## One product, two surfaces
 
-`src/QrSimple.Api/wwwroot/app.css` (admin UI, linked from `App.razor`) and the inline `<style>` block in `src/QrSimple.Api/ScanPage.cs` (public scan page) are one shared design system, not two independent stylesheets. Before writing new CSS, check the `:root` custom properties at the top of `app.css` — colors, radius, shadow formulas — and reuse an existing `var(--...)` token. Introducing a new color/radius/shadow value on one surface without carrying it to the other is a bug, not a style choice.
+`src/QrSimple.Api/wwwroot/app.css` (admin UI, linked from `App.razor`) and the inline `<style>` block in `src/QrSimple.Api/ScanPage.cs` (public scan page) are one shared design system, not two independent stylesheets. Both link `wwwroot/brand/tokens.css`, which owns every colour, radius, shadow and the self-hosted Inter `@font-face` rules. Before writing new CSS, check the `--brand-*` properties there and reuse an existing `var(--...)` token; `app.css`'s `:root` block only aliases them for readability. Introducing a literal hex/radius/shadow value on either surface is a bug, not a style choice — add it to `tokens.css` instead, and keep the upstream master at `/home/tsogo/icsmongolia/brand-kit/` in sync. Icons are inlined Lucide via `Components/Shared/Icon.razor` (admin) and matching `const` strings in `ScanPage.cs`; don't mix in another icon family or a bare Unicode glyph.
 
 ## Verify a change actually rendered
 
@@ -18,7 +18,7 @@ Full environment setup, sign-in, and troubleshooting: `docs/local-browser-testin
 3. `browser_navigate` to the changed page, then `browser_take_screenshot` with no `filename` argument — it renders inline in the conversation (the service runs with `--image-responses allow`). An explicit `filename` currently resolves to the wrong path and fails.
 4. `browser_resize` to a phone width (~390×844) and screenshot again — every admin page and the scan page must stay usable there; the `@media` blocks in `app.css`/`ScanPage.cs` are where that's enforced.
 5. Check `browser_console_messages` for errors the change introduced.
-6. For an exact style claim ("the header is `#356fbd`"), confirm with `browser_evaluate` computed styles — screenshots compress and shift color, computed styles don't.
+6. For an exact style claim ("the header is `#156FC1`"), confirm with `browser_evaluate` computed styles — screenshots compress and shift color, computed styles don't. Resolved custom properties are worth checking too: `getComputedStyle(document.documentElement).getPropertyValue("--brand-primary")` catches a `tokens.css` that silently failed to load.
 
 A change isn't done until steps 3–6 pass at both widths, signed in if the page requires it.
 

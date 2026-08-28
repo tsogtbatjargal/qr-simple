@@ -29,13 +29,13 @@
             <ValidationMessage For="() => Model.Role" />
         </div>
 
-        <button type="submit" class="btn btn-primary" disabled="@IsSaving">@(IsSaving ? "Adding..." : "Add")</button>
+        <button type="submit" class="btn btn-primary" disabled="@IsSaving"><Icon Name="plus" />@(IsSaving ? "Adding..." : "Add")</button>
     </EditForm>
 </div>
 
 @if (Error is not null)
 {
-    <p class="error">@Error</p>
+    <p class="error"><Icon Name="x-circle" />@Error</p>
 }
 
 @code {

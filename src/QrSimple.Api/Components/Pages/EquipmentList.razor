@@ -4,7 +4,7 @@
 
 <h1>Equipment</h1>
 
-<a class="add-link" href="/app/equipment/add">+ Add equipment</a>
+<a class="add-link" href="/app/equipment/add"><Icon Name="plus" />Add equipment</a>
 
 @if (AllEquipment is null)
 {
@@ -17,7 +17,10 @@ else if (AllEquipment.Count == 0)
 else
 {
     <div class="table-controls">
-        <input class="search-input" type="search" placeholder="Search equipment..." @bind="SearchText" @bind:event="oninput" />
+        <div class="search-field">
+            <Icon Name="search" />
+            <input class="search-input" type="search" placeholder="Search equipment..." aria-label="Search equipment" @bind="SearchText" @bind:event="oninput" />
+        </div>
         <label class="checkbox-label"><input type="checkbox" @bind="ShowRetired" /> Show retired</label>
         <span class="result-count">@Visible.Count of @BaseVisible.Count</span>
     </div>
@@ -26,11 +29,11 @@ else
         <table>
             <thead>
                 <tr>
-                    <th class="sortable" @onclick="@(() => SetSort("Name"))">Name@(SortArrow("Name"))</th>
-                    <th class="sortable" @onclick="@(() => SetSort("Category"))">Category@(SortArrow("Category"))</th>
-                    <th class="sortable" @onclick="@(() => SetSort("Serial"))">Serial@(SortArrow("Serial"))</th>
-                    <th class="sortable" @onclick="@(() => SetSort("Site"))">Site@(SortArrow("Site"))</th>
-                    <th class="sortable" @onclick="@(() => SetSort("Status"))">Status@(SortArrow("Status"))</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Name"))">Name @if (SortColumn == "Name") { <Icon Name="@SortArrowIcon" Class="sort-arrow" /> }</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Category"))">Category @if (SortColumn == "Category") { <Icon Name="@SortArrowIcon" Class="sort-arrow" /> }</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Serial"))">Serial @if (SortColumn == "Serial") { <Icon Name="@SortArrowIcon" Class="sort-arrow" /> }</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Site"))">Site @if (SortColumn == "Site") { <Icon Name="@SortArrowIcon" Class="sort-arrow" /> }</th>
+                    <th class="sortable" @onclick="@(() => SetSort("Status"))">Status @if (SortColumn == "Status") { <Icon Name="@SortArrowIcon" Class="sort-arrow" /> }</th>
                 </tr>
             </thead>
             <tbody>
@@ -117,6 +120,7 @@ else
         }
     }
 
-    private string SortArrow(string column) =>
-        SortColumn != column ? "" : SortAscending ? " ▲" : " ▼";
+    // Only rendered on the column that is currently sorted, so this just picks the
+    // direction — the caller decides whether to show an arrow at all.
+    private string SortArrowIcon => SortAscending ? "arrow-up" : "arrow-down";
 }

@@ -4,24 +4,24 @@
 <div class="page">
     <header class="site-header">
         <a class="brand" href="/app">
-            <img src="brand/logos/ics-logo.png" alt="ICS Mongolia" />
-            <span class="product-name">qr-simple</span>
+            <img class="brand-logo" src="/brand/logos/ics-logo.png" alt="ICS Mongolia" width="1381" height="678" />
+            <span class="brand-name">Equipment Registry</span>
         </a>
         <nav class="nav-links">
             <AuthorizeView>
                 <Authorized>
                     @if (IsAdmin)
                     {
-                        <a href="/app/users">Users</a>
-                        <a href="/app/categories">Categories</a>
+                        <a href="/app/users"><Icon Name="users" />Users</a>
+                        <a href="/app/categories"><Icon Name="tag" />Categories</a>
                     }
-                    <span class="user-email">@context.User.FindFirst(ClaimTypes.Email)?.Value</span>
+                    <span class="user-email"><Icon Name="user" />@context.User.FindFirst(ClaimTypes.Email)?.Value</span>
                     <form method="post" action="/logout" class="signout-form">
-                        <button type="submit" class="btn btn-ghost">Sign out</button>
+                        <button type="submit" class="btn btn-ghost"><Icon Name="log-out" />Sign out</button>
                     </form>
                 </Authorized>
                 <NotAuthorized>
-                    <a class="btn btn-primary" href="/login">Sign in with Google</a>
+                    <a class="btn btn-primary" href="/login"><Icon Name="log-in" />Sign in with Google</a>
                 </NotAuthorized>
             </AuthorizeView>
         </nav>

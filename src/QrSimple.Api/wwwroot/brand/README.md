@@ -4,26 +4,41 @@ Shared brand/theme foundation for ICS Mongolia products (qr-simple, and future p
 
 ## Contents
 
-- `tokens.css` — CSS custom properties (colors, radius, shadow, font). Copy these
-  `:root` declarations into a project's stylesheet, or link this file directly.
-  Primary blue (`#166fc0`) is extracted from the actual ICS logo mark — treat it
-  as the source of truth over any color that's crept into a specific site's CSS.
+- `tokens.css` — CSS custom properties (colors, radius, shadow, font) **and** the
+  `@font-face` rules for the self-hosted Inter files. Link this file and you get
+  both the palette and the typeface. Primary blue (`#156FC1`) is the company's
+  stated brand colour and matches the logo mark — treat it as the source of truth
+  over any colour that's crept into a specific app's CSS. Orange (`#ff7a1a`) was
+  the old primary and is fully retired; do not reintroduce it.
+- `fonts/` — Inter as variable woff2, one file per unicode subset. `cyrillic-ext`
+  is not optional: Mongolian's Ө (U+04E8) and Ү (U+04AE) fall outside the base
+  `cyrillic` range and drop to a fallback font without it.
 - `logos/` — official logo + favicon set, as PNG (no SVG source currently exists).
-- `icons/` — a starter subset of Lucide icons (MIT licensed, https://lucide.dev),
-  as plain SVG files. Pull more from the same set as needed — don't mix icon
-  families within one product.
+  `ics-logo.png` is 1381×678 and dark-on-transparent, so it needs a light plate
+  behind it rather than being placed straight onto the blue header.
+- `icons/` — a subset of Lucide icons (ISC licensed, https://lucide.dev), as plain
+  SVG files. Pull more from the same set as needed — don't mix icon families
+  within one product.
 
 ## Using this in a project
 
 1. Copy this folder (or the pieces you need) into the project's static-asset
-   directory (e.g. a Blazor app's `wwwroot/`).
-2. Reference `var(--brand-*)` tokens instead of hardcoding hex values.
-3. Icons are single-color SVGs using `currentColor` — set `color` on a wrapping
-   element to recolor them, don't edit the SVG fill directly.
+   directory (e.g. a Blazor app's `wwwroot/`). The `@font-face` URLs are relative
+   to `tokens.css`, so copying the folder wholesale keeps them resolving.
+2. Link `tokens.css` **before** the app stylesheet, then reference `var(--brand-*)`
+   tokens instead of hardcoding hex values.
+3. Icons are single-color SVGs using `currentColor`. Inline them rather than using
+   `<img>` so `color` and font-size can drive them; see
+   `Components/Shared/Icon.razor` for how qr-simple does it. Setting `fill: none;
+   stroke: currentColor` explicitly is required — inline SVG otherwise defaults to
+   `fill: black; stroke: none` and renders a stroke-only path as a solid blob.
 
 ## Status
 
-Foundation only, as of 2026-08-25. qr-simple has these files copied into
-`src/QrSimple.Api/wwwroot/brand/`, but its CSS (`app.css` / `ScanPage.cs`)
-hasn't been rewired to consume the new tokens yet — that's separate follow-up
-work, done locally rather than on this container.
+Wired up as of 2026-08-28. Both qr-simple surfaces — the admin UI (`wwwroot/app.css`)
+and the public scan page (`ScanPage.cs`) — link `tokens.css` and consume the tokens;
+neither carries a literal hex value any more. The favicons, header logo, and Inter
+are all live.
+
+Upstream master copy of this kit lives outside the repo at
+`/home/tsogo/icsmongolia/brand-kit/`; keep the two in sync when either changes.

@@ -31,31 +31,31 @@ else
                 <ValidationMessage For="() => Model.Role" />
             </div>
 
-            <button type="submit" class="btn btn-primary" disabled="@IsBusy">@(IsBusy ? "Saving..." : "Save role")</button>
+            <button type="submit" class="btn btn-primary" disabled="@IsBusy"><Icon Name="check-circle" />@(IsBusy ? "Saving..." : "Save role")</button>
         </EditForm>
     </div>
 
     <div class="button-row">
         @if (Item.IsActive)
         {
-            <button class="btn btn-danger" disabled="@IsBusy" @onclick="() => DeactivateConfirm!.Show()">Deactivate</button>
+            <button class="btn btn-danger" disabled="@IsBusy" @onclick="() => DeactivateConfirm!.Show()"><Icon Name="x-circle" />Deactivate</button>
         }
         else
         {
-            <button class="btn btn-primary" disabled="@IsBusy" @onclick="ReactivateAsync">@(IsBusy ? "Reactivating..." : "Reactivate")</button>
+            <button class="btn btn-primary" disabled="@IsBusy" @onclick="ReactivateAsync"><Icon Name="check-circle" />@(IsBusy ? "Reactivating..." : "Reactivate")</button>
         }
     </div>
 
     <ConfirmDialog @ref="DeactivateConfirm"
                     Title="Deactivate this user?"
-                    Message="@($"\"{Item.Email}\" will lose access to qr-simple until reactivated.")"
+                    Message="@($"\"{Item.Email}\" will lose access to the Equipment Registry until reactivated.")"
                     ConfirmText="Deactivate"
                     OnConfirmed="DeactivateAsync" />
 }
 
 @if (Error is not null)
 {
-    <p class="error">@Error</p>
+    <p class="error"><Icon Name="x-circle" />@Error</p>
 }
 
 @code {

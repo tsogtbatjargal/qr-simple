@@ -4,7 +4,9 @@
 <div class="toast-host">
     @foreach (var toast in Toasts)
     {
-        <div class="toast @(toast.Kind == ToastKind.Error ? "toast-error" : "toast-success")" @key="toast.Id">@toast.Message</div>
+        <div class="toast @(toast.Kind == ToastKind.Error ? "toast-error" : "toast-success")" @key="toast.Id">
+            <Icon Name="@(toast.Kind == ToastKind.Error ? "x-circle" : "check-circle")" />@toast.Message
+        </div>
     }
 </div>
 

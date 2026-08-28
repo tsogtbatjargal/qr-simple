@@ -16,7 +16,7 @@ public class CategoriesAdminUiTests(ApiFactory factory) : IClassFixture<ApiFacto
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Categories", body);
-        Assert.Contains("+ Add category", body);
+        Assert.Contains("Add category", body);
     }
 
     [Fact]

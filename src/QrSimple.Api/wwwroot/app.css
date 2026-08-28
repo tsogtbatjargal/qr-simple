@@ -1,16 +1,35 @@
+/*
+  Admin UI stylesheet. The palette, typeface, radius and shadow values all come
+  from brand/tokens.css (linked ahead of this file in App.razor) — the short
+  aliases below exist so rules stay readable, but they must always resolve to a
+  var(--brand-*) token rather than a literal hex value. The public scan page
+  (ScanPage.cs) links the same token file; a new colour introduced here has to
+  be carried there too, and vice versa.
+*/
 :root {
     color-scheme: light;
-    --blue: #356fbd;
-    --blue-dark: #285da3;
-    --bg: #eef3fa;
-    --text: #14213d;
-    --muted: #516178;
-    --accent: #f5b700;
-    --danger: #b42318;
-    --danger-bg: #fff1f0;
-    --border: #e3e9f3;
-    --radius: 14px;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --blue: var(--brand-primary);
+    --blue-dark: var(--brand-primary-dark);
+    --blue-bright: var(--brand-primary-bright);
+    --tint: var(--brand-primary-light);
+    --bg: var(--brand-bg);
+    --surface: var(--brand-surface);
+    --surface-alt: var(--brand-surface-alt);
+    --text: var(--brand-text);
+    --muted: var(--brand-muted);
+    --focus: var(--brand-focus);
+    --danger: var(--brand-danger);
+    --danger-dark: var(--brand-danger-dark);
+    --danger-bg: var(--brand-danger-bg);
+    --border: var(--brand-border);
+    --border-strong: var(--brand-border-strong);
+    --radius: var(--brand-radius);
+    --radius-sm: var(--brand-radius-sm);
+    --shadow-sm: var(--brand-shadow-sm);
+    --shadow: var(--brand-shadow);
+    --shadow-md: var(--brand-shadow-md);
+    --shadow-lg: var(--brand-shadow-lg);
+    font-family: var(--brand-font);
 }
 
 * { box-sizing: border-box; }
@@ -21,25 +40,58 @@ body { background: var(--bg); color: var(--text); }
 
 .page { min-height: 100vh; display: flex; flex-direction: column; }
 
+/* Inline SVG defaults to fill:black/stroke:none, which renders a stroke-only
+   Lucide path as a solid blob. Every icon must opt back out explicitly. */
+.icon {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 header.site-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 14px clamp(16px, 4vw, 32px);
+    padding: 12px clamp(16px, 4vw, 32px);
     background: var(--blue);
     color: white;
-    box-shadow: 0 6px 18px rgb(28 68 123 / 18%);
+    box-shadow: var(--shadow-md);
     flex-wrap: wrap;
 }
 
 header.site-header a.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     color: white;
     text-decoration: none;
-    font-weight: 700;
-    font-size: 1.25rem;
-    letter-spacing: -0.01em;
 }
+
+/* The logo is a dark-on-transparent mark, so it needs a white plate to sit on
+   rather than being dropped straight onto the blue header. */
+header.site-header a.brand .brand-logo {
+    height: 34px;
+    width: auto;
+    display: block;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: white;
+}
+
+header.site-header a.brand .brand-name {
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+}
+
+header.site-header a.brand:hover .brand-name { text-decoration: underline; }
 
 header.site-header nav.nav-links {
     display: flex;
@@ -49,6 +101,9 @@ header.site-header nav.nav-links {
 }
 
 header.site-header nav.nav-links a:not(.btn) {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     color: white;
     text-decoration: none;
     font-weight: 600;
@@ -57,9 +112,26 @@ header.site-header nav.nav-links a:not(.btn) {
 
 header.site-header nav.nav-links a:not(.btn):hover { opacity: 1; text-decoration: underline; }
 
-header.site-header .user-email { opacity: .85; font-size: .9rem; }
+header.site-header nav.nav-links a:not(.btn) .icon { font-size: 1.05rem; }
+
+header.site-header .user-email {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    opacity: .85;
+    font-size: .9rem;
+}
+
+header.site-header .user-email .icon { font-size: 1rem; }
 
 header.site-header form.signout-form { margin: 0; }
+
+header.site-header a:focus-visible,
+header.site-header button:focus-visible {
+    outline: 3px solid white;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
 
 main.content {
     flex: 1;
@@ -68,7 +140,7 @@ main.content {
     padding: clamp(16px, 3vw, 32px);
 }
 
-h1 { font-size: clamp(1.5rem, 4vw, 2rem); margin: 0 0 20px; font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(1.5rem, 4vw, 2rem); margin: 0 0 20px; font-weight: 700; line-height: 1.2; color: var(--brand-navy); }
 
 a { color: var(--blue); }
 a:hover { color: var(--blue-dark); }
@@ -77,8 +149,9 @@ a:hover { color: var(--blue-dark); }
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     padding: 10px 20px;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     border: none;
     cursor: pointer;
     font-weight: 600;
@@ -88,19 +161,25 @@ a:hover { color: var(--blue-dark); }
     transition: transform .15s ease, background .15s ease;
 }
 
-.btn-primary { background: var(--blue); color: white; box-shadow: 0 6px 18px rgb(28 68 123 / 15%); }
+.btn .icon { font-size: 1.05rem; }
+
+.btn-primary { background: var(--blue); color: white; box-shadow: var(--shadow-md); }
 .btn-primary:hover { background: var(--blue-dark); transform: translateY(-1px); color: white; }
 
 .btn-ghost { background: rgb(255 255 255 / 15%); color: white; border: 1px solid rgb(255 255 255 / 40%); }
 .btn-ghost:hover { background: rgb(255 255 255 / 25%); }
 
 .btn-ghost-light { background: white; color: var(--muted); border: 1.5px solid var(--border); }
-.btn-ghost-light:hover { background: #f4f7fc; color: var(--text); }
+.btn-ghost-light:hover { background: var(--tint); color: var(--text); border-color: var(--border-strong); }
 
 .btn-danger { background: var(--danger); color: white; }
-.btn-danger:hover { background: #8a1c13; }
+.btn-danger:hover { background: var(--danger-dark); }
 
-.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Inside the blue header the bright-blue ring is invisible against the
+   background, so ghost buttons there switch to a white ring. */
+header.site-header .btn:focus-visible { outline-color: white; }
 
 .btn:disabled { opacity: .6; cursor: not-allowed; transform: none !important; box-shadow: none; }
 
@@ -115,31 +194,50 @@ a:hover { color: var(--blue-dark); }
 }
 .breadcrumbs a { color: var(--muted); text-decoration: none; font-weight: 600; }
 .breadcrumbs a:hover { color: var(--blue); text-decoration: underline; }
-.breadcrumbs .sep { opacity: .5; }
+.breadcrumbs .sep { opacity: .5; display: inline-flex; }
+.breadcrumbs .sep .icon { font-size: .95rem; }
 .breadcrumbs .current { color: var(--text); font-weight: 600; }
 
 .table-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-.search-input { max-width: 280px; margin: 0; }
+
+/* The search field wraps its input so the icon can sit inside the box. */
+.search-field { position: relative; display: flex; align-items: center; max-width: 280px; width: 100%; }
+.search-field .icon { position: absolute; left: 12px; font-size: 1.05rem; color: var(--muted); pointer-events: none; }
+
+/* Repeats the :not() chain from the base input rule below to match its
+   specificity — a plain `.search-input` selector loses the cascade, and the
+   padding that clears the icon would silently never apply, leaving the icon
+   sitting on top of the typed text. Same reason the .invalid rules repeat it. */
+input:not([type=submit]):not([type=checkbox]):not([type=radio]).search-input {
+    max-width: none;
+    margin: 0;
+    padding-left: 38px;
+}
+
 .table-controls .result-count { color: var(--muted); font-size: .85rem; }
 .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); font-weight: 600; margin: 0; }
 
 th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--blue-dark); }
-th.sortable .sort-arrow { margin-left: 4px; opacity: .7; display: inline-block; }
+th.sortable .sort-arrow { margin-left: 4px; opacity: .7; font-size: .95em; vertical-align: -0.15em; }
 
 .add-link {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     margin-bottom: 20px;
     font-weight: 600;
     color: var(--blue);
     text-decoration: none;
 }
 .add-link:hover { text-decoration: underline; }
+.add-link .icon { font-size: 1.05rem; }
 
 .card, .table-card, .form-card {
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius);
-    box-shadow: 0 6px 18px rgb(28 68 123 / 9%);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
     padding: clamp(16px, 3vw, 24px);
     margin-bottom: 20px;
 }
@@ -148,11 +246,13 @@ th.sortable .sort-arrow { margin-left: 4px; opacity: .7; display: inline-block; 
 
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-th { background: #f4f7fc; color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+th { background: var(--bg); color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
 tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: #f7f9fd; }
+tbody tr:hover { background: var(--surface-alt); }
 td a { font-weight: 600; text-decoration: none; }
 td a:hover { text-decoration: underline; }
+a.open-link { display: inline-flex; align-items: center; gap: 6px; }
+a.open-link .icon { font-size: .95rem; }
 
 form div { margin-bottom: 16px; }
 
@@ -162,18 +262,18 @@ input[type=text], input[type=email], input:not([type=submit]):not([type=checkbox
     width: 100%;
     max-width: 420px;
     padding: 10px 12px;
-    border: 1.5px solid #d7e0ee;
-    border-radius: 10px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font-size: 1rem;
     font-family: inherit;
-    background: white;
+    background: var(--surface);
     color: var(--text);
 }
 
 input:focus, select:focus {
     outline: none;
     border-color: var(--blue);
-    box-shadow: 0 0 0 3px rgb(53 111 189 / 15%);
+    box-shadow: 0 0 0 3px rgb(21 111 193 / 15%);
 }
 
 /* Matches the :not() chain's specificity above so this actually wins the cascade instead of
@@ -189,6 +289,9 @@ input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid:focus, s
 .validation-errors { color: var(--danger); padding-left: 20px; margin: 0 0 16px; }
 
 .error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 14px 18px;
     border: 2px solid var(--danger);
     border-radius: 12px;
@@ -197,6 +300,7 @@ input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid:focus, s
     font-weight: 600;
     margin: 16px 0;
 }
+.error .icon { font-size: 1.2rem; }
 
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; margin: 0 0 20px; }
 dt { color: var(--muted); font-weight: 600; }
@@ -205,8 +309,9 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .qr-code {
     display: block;
     border-radius: 12px;
-    box-shadow: 0 6px 18px rgb(28 68 123 / 15%);
-    background: white;
+    box-shadow: var(--shadow-md);
+    background: var(--surface);
+    border: 1px solid var(--border);
     padding: 12px;
     margin: 8px 0 16px;
 }
@@ -219,13 +324,22 @@ dd { margin: 0; overflow-wrap: anywhere; }
     max-width: 320px;
     aspect-ratio: 16 / 10;
     object-fit: contain;
-    background: #f4f7fc;
+    background: var(--bg);
     border: 1.5px solid var(--border);
     border-radius: 12px;
     margin-bottom: 16px;
 }
 
-h2 { font-size: 1.1rem; font-weight: 700; margin: 28px 0 12px; }
+h2 {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 28px 0 12px;
+    color: var(--brand-navy);
+}
+h2 .icon { font-size: 1.15rem; color: var(--blue); }
 
 .button-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 20px; }
 
@@ -233,10 +347,25 @@ h2 { font-size: 1.1rem; font-weight: 700; margin: 28px 0 12px; }
     max-width: 480px;
     margin: 60px auto;
     text-align: center;
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius);
-    box-shadow: 0 6px 18px rgb(28 68 123 / 9%);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
     padding: clamp(20px, 5vw, 32px);
+}
+
+/* Centred status icon for the empty/blocked states. */
+.state-icon {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 14px;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--danger);
 }
 
 .modal-backdrop {
@@ -252,7 +381,7 @@ h2 { font-size: 1.1rem; font-weight: 700; margin: 28px 0 12px; }
 }
 
 .modal-card {
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius);
     box-shadow: 0 20px 48px rgb(20 33 61 / 30%);
     padding: clamp(20px, 4vw, 28px);
@@ -284,26 +413,39 @@ h2 { font-size: 1.1rem; font-weight: 700; margin: 28px 0 12px; }
 }
 
 .toast {
-    background: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: var(--brand-navy);
     color: white;
     font-weight: 600;
     font-size: .9rem;
     padding: 12px 20px;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     box-shadow: 0 10px 28px rgb(20 33 61 / 25%);
     animation: toast-in .2s ease;
 }
 
-.toast-success { background: var(--text); }
+.toast .icon { font-size: 1.1rem; }
+
+.toast-success { background: var(--brand-navy); }
 .toast-error { background: var(--danger); }
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
+@media (prefers-reduced-motion: reduce) {
+    .btn, .document { transition: none; }
+    .btn-primary:hover { transform: none; }
+    .modal-backdrop, .modal-card, .toast { animation: none; }
+}
+
 @media (max-width: 600px) {
     header.site-header { flex-direction: column; align-items: flex-start; }
     header.site-header nav.nav-links { width: 100%; justify-content: space-between; }
+    header.site-header a.brand .brand-logo { height: 30px; }
+    header.site-header a.brand .brand-name { font-size: 1.05rem; }
     main.content { padding: 14px; }
     dl { grid-template-columns: 1fr; }
     dd + dt { margin-top: 8px; }
@@ -313,5 +455,5 @@ h2 { font-size: 1.1rem; font-weight: 700; margin: 28px 0 12px; }
     .toast { text-align: center; }
     .modal-actions { flex-direction: column-reverse; }
     .modal-actions .btn { width: 100%; }
-    .search-input { max-width: none; width: 100%; }
+    .search-field { max-width: none; }
 }

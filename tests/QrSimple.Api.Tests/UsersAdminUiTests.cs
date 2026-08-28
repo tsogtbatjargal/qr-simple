@@ -16,7 +16,7 @@ public class UsersAdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Users", body);
-        Assert.Contains("+ Add user", body);
+        Assert.Contains("Add user", body);
     }
 
     [Fact]

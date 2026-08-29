@@ -19,6 +19,7 @@ Anyone — planning session or implementing agent — should feel free to leave 
 | # | Title | Status | Summary |
 |---|-------|--------|---------|
 | [0001](0001-document-file-upload.md) | Photo/document file upload for Equipment | Implemented | Switched Equipment photo/document links from URL-only to real file upload, bytes stored in Postgres, served via `GET /documents/{id}/content`. |
+| [0002](0002-inspection-records.md) | Periodic inspection records for Equipment | Ready for implementation | New `Inspection` entity (dated, noted, attributed PDF) uploaded per Equipment by Admin/Operator, browsable publicly from the scan page at `/e/{id}/inspections` with a 6-month recent window and older records collapsed. |
 
 ## Handoff prompt skeleton
 

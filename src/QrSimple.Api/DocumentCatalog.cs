@@ -19,10 +19,13 @@ public abstract record DocumentResult
     };
 }
 
+public enum UploadKind { Photo, Document, Inspection }
+
 public static class DocumentUpload
 {
     public const long MaxPhotoBytes = 5 * 1024 * 1024;
     public const long MaxDocumentBytes = 20 * 1024 * 1024;
+    public const long MaxInspectionBytes = 10 * 1024 * 1024;
 
     public static readonly string[] PhotoExtensions = [".jpg", ".jpeg", ".png", ".webp"];
     public static readonly string[] PhotoContentTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -37,14 +40,22 @@ public static class DocumentUpload
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
 
+    // Inspections accept only PDF, unlike Documents (.pdf/.doc/.docx/.xls/.xlsx) — an inspection
+    // report is a signed-off artifact, and an editable .docx invites "which copy is the real
+    // one." See docs/plans/0002-inspection-records.md decision 4.
+    public static readonly string[] InspectionExtensions = [".pdf"];
+    public static readonly string[] InspectionContentTypes = ["application/pdf"];
+
     // Extension + browser-reported ContentType only, no magic-byte sniffing — internal tool,
     // trusted Admin/Operator roles (see docs/plans/0001-document-file-upload.md decision #4).
-    public static string? Validate(string fileName, string contentType, long sizeBytes, bool isPhoto)
+    public static string? Validate(string fileName, string contentType, long sizeBytes, UploadKind kind)
     {
-        var extensions = isPhoto ? PhotoExtensions : DocumentExtensions;
-        var contentTypes = isPhoto ? PhotoContentTypes : DocumentContentTypes;
-        var maxBytes = isPhoto ? MaxPhotoBytes : MaxDocumentBytes;
-        var kind = isPhoto ? "photo" : "document";
+        var (extensions, contentTypes, maxBytes, label) = kind switch
+        {
+            UploadKind.Photo => (PhotoExtensions, PhotoContentTypes, MaxPhotoBytes, "photo"),
+            UploadKind.Inspection => (InspectionExtensions, InspectionContentTypes, MaxInspectionBytes, "inspection"),
+            _ => (DocumentExtensions, DocumentContentTypes, MaxDocumentBytes, "document"),
+        };
 
         if (sizeBytes <= 0)
         {
@@ -53,14 +64,14 @@ public static class DocumentUpload
 
         if (sizeBytes > maxBytes)
         {
-            return $"File is too large. Maximum size for a {kind} is {maxBytes / (1024 * 1024)}MB.";
+            return $"File is too large. Maximum size for a {label} is {maxBytes / (1024 * 1024)}MB.";
         }
 
         var extension = Path.GetExtension(fileName);
         if (!extensions.Contains(extension, StringComparer.OrdinalIgnoreCase) ||
             !contentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
         {
-            return $"Unsupported file type for a {kind}. Allowed: {string.Join(", ", extensions)}.";
+            return $"Unsupported file type for a {label}. Allowed: {string.Join(", ", extensions)}.";
         }
 
         return null;
@@ -88,7 +99,7 @@ public static class DocumentCatalog
     public static async Task<DocumentResult> AddUploadAsync(
         Guid equipmentId, string? label, byte[] content, string contentType, string fileName, AppDbContext db)
     {
-        var validationError = DocumentUpload.Validate(fileName, contentType, content.LongLength, isPhoto: false);
+        var validationError = DocumentUpload.Validate(fileName, contentType, content.LongLength, UploadKind.Document);
         if (validationError is not null)
         {
             return new DocumentResult.InvalidFile(validationError);
@@ -119,7 +130,7 @@ public static class DocumentCatalog
     public static async Task<DocumentResult> SetPhotoUploadAsync(
         Guid equipmentId, byte[] content, string contentType, string fileName, AppDbContext db)
     {
-        var validationError = DocumentUpload.Validate(fileName, contentType, content.LongLength, isPhoto: true);
+        var validationError = DocumentUpload.Validate(fileName, contentType, content.LongLength, UploadKind.Photo);
         if (validationError is not null)
         {
             return new DocumentResult.InvalidFile(validationError);

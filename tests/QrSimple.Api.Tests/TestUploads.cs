@@ -31,4 +31,25 @@ internal static class TestUploads
         }
         return content;
     }
+
+    public static MultipartFormDataContent Inspection(
+        string kind = InspectionKinds.Monthly,
+        DateOnly? inspectionDate = null,
+        string? note = null,
+        string fileName = "inspection.pdf",
+        byte[]? bytes = null,
+        string contentType = "application/pdf")
+    {
+        var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(bytes ?? FakePdfBytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        content.Add(fileContent, "file", fileName);
+        content.Add(new StringContent(kind), "kind");
+        content.Add(new StringContent((inspectionDate ?? BusinessTime.Today()).ToString("yyyy-MM-dd")), "inspectionDate");
+        if (note is not null)
+        {
+            content.Add(new StringContent(note), "note");
+        }
+        return content;
+    }
 }

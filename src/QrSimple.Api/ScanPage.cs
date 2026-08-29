@@ -18,7 +18,10 @@ public static class ScanPage
     private const string AlertIcon =
         """<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>""";
 
-    public static string Render(Equipment equipment, IReadOnlyList<Document> documents)
+    private const string ClipboardCheckIcon =
+        """<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>""";
+
+    public static string Render(Equipment equipment, IReadOnlyList<Document> documents, int inspectionCount)
     {
         string Encode(string value) => WebUtility.HtmlEncode(value);
 
@@ -61,28 +64,32 @@ public static class ScanPage
                     """;
             }));
 
-        var documentsSection = documentLinks.Length > 0
-            ? $"""<nav class="documents" aria-label="Equipment documents">{documentLinks}</nav>"""
+        // Count is the true total (no cap — see docs/plans/0002-inspection-records.md decision
+        // 18). Rendered only when non-zero: a technician tapping into an empty inspections page
+        // is worse than not offering the link at all.
+        var inspectionsPanel = inspectionCount > 0
+            ? $"""
+                <a class="panel document" href="/e/{equipment.Id}/inspections">
+                    {ClipboardCheckIcon}<span>Inspection records ({inspectionCount})</span>{ExternalLinkIcon}
+                </a>
+                """
+            : "";
+
+        var documentsSection = documentLinks.Length > 0 || inspectionsPanel.Length > 0
+            ? $"""<nav class="documents" aria-label="Equipment documents">{documentLinks}{inspectionsPanel}</nav>"""
             : """<p class="empty-documents">No documents are available for this equipment.</p>""";
 
         // Colours, radii, shadows and the typeface all come from brand/tokens.css, linked
         // in the head below. This page and the admin UI (wwwroot/app.css) are one shared
-        // design system — never introduce a literal colour on one surface alone.
-        const string styles = """
-            :root { color-scheme: light; font-family: var(--brand-font); }
-            * { box-sizing: border-box; }
-            body { margin: 0; background: var(--brand-bg); color: var(--brand-text); }
-            .icon { width: 1em; height: 1em; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-            .site-header { display: flex; align-items: center; gap: 12px; padding: 12px clamp(12px, 3vw, 24px); background: var(--brand-surface); border-bottom: 1px solid var(--brand-border); box-shadow: var(--brand-shadow-sm); }
-            .site-header img { height: 30px; width: auto; display: block; }
-            .site-header .product { font-weight: 700; font-size: .95rem; color: var(--brand-navy); letter-spacing: -0.01em; }
-            main { width: min(100%, 760px); min-height: 100vh; margin: 0 auto; padding: clamp(12px, 3vw, 24px); }
+        // design system — never introduce a literal colour on one surface alone. Head tags,
+        // the site header, and the base :root/body/.icon/.site-header/main/.panel rules live
+        // in PublicPageChrome, shared with InspectionsPage.cs.
+        var styles = PublicPageChrome.BaseStyles + """
             .stack { display: grid; gap: 14px; }
             .photo { min-height: 220px; display: grid; place-items: center; padding: 18px; background: var(--brand-primary); border-radius: 18px; box-shadow: var(--brand-shadow-md); }
             .photo-frame { width: min(100%, 340px); aspect-ratio: 16 / 10; display: grid; grid-template-rows: 1fr; grid-template-columns: 1fr; place-items: center; overflow: hidden; background: var(--brand-surface); border-radius: 12px; padding: 16px; }
             .photo img { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; }
             .placeholder { width: 74%; max-height: 78%; color: var(--brand-primary); }
-            .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: var(--brand-primary); color: white; text-align: center; box-shadow: var(--brand-shadow-md); }
             h1 { margin: 0; font-size: clamp(1.55rem, 6vw, 2.25rem); line-height: 1.15; font-weight: 700; }
             .documents { display: grid; gap: 14px; }
             .document { position: relative; gap: 14px; padding-inline: 56px; font-size: clamp(1.2rem, 5vw, 1.65rem); font-weight: 600; text-decoration: none; transition: transform .15s ease, background .15s ease; }
@@ -103,11 +110,9 @@ public static class ScanPage
                 .document:hover { transform: none; }
             }
             @media (max-width: 480px) {
-                main { padding: 10px; }
                 .stack, .documents { gap: 10px; }
                 .photo { min-height: 190px; border-radius: 12px; }
                 .photo-frame { padding: 10px; }
-                .panel { min-height: 76px; border-radius: 10px; }
                 .document { padding-inline: 46px; gap: 10px; }
                 .arrow { right: 16px; }
                 dl { grid-template-columns: 1fr; gap: 4px; }
@@ -119,20 +124,11 @@ public static class ScanPage
             <!doctype html>
             <html lang="en">
             <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>{Encode(equipment.Name)}</title>
-                <meta name="theme-color" content="#156fc1">
-                <link rel="icon" type="image/png" sizes="32x32" href="/brand/logos/favicon-32.png">
-                <link rel="apple-touch-icon" href="/brand/logos/apple-touch-icon.png">
-                <link rel="stylesheet" href="/brand/tokens.css">
+                {PublicPageChrome.HeadTags(Encode(equipment.Name))}
                 <style>{styles}</style>
             </head>
             <body>
-                <header class="site-header">
-                    <img src="/brand/logos/ics-logo.png" alt="ICS Mongolia" width="1381" height="678">
-                    <span class="product">Equipment Registry</span>
-                </header>
+                {PublicPageChrome.Header}
                 <main>
                     <div class="stack">
                         <section class="photo" aria-label="Equipment photo">

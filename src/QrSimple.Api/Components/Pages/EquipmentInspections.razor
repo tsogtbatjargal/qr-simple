@@ -1,0 +1,354 @@
+@page "/app/equipment/{Id:guid}/inspections"
+@attribute [Authorize]
+@inherits RoleGatedComponentBase
+
+@if (Equipment is null)
+{
+    <p>Equipment not found.</p>
+}
+else
+{
+    <Breadcrumbs Items="@(new() { new("Equipment", "/app"), new(Equipment.Name, $"/app/equipment/{Id}"), new("Inspections") })" />
+
+    <h1>@Equipment.Name</h1>
+    <p class="status-line">@Equipment.SerialNumber &middot; Inspection records</p>
+
+    @if (CanManageInspections)
+    {
+        @if (Equipment.Status == EquipmentStatus.Retired)
+        {
+            <p class="status-line">This equipment is retired; new inspection records cannot be added.</p>
+        }
+        else
+        {
+            <div class="form-card">
+                <div>
+                    <label>
+                        Kind
+                        <InputSelect @bind-Value="NewKind">
+                            @foreach (var kind in InspectionKinds.All)
+                            {
+                                <option value="@kind">@InspectionKinds.DisplayName(kind)</option>
+                            }
+                        </InputSelect>
+                    </label>
+                </div>
+                <div>
+                    <label>Inspection date <InputDate @bind-Value="NewDate" /></label>
+                </div>
+                <div>
+                    <label>Note (optional) <InputTextArea @bind-Value="NewNote" maxlength="1000" /></label>
+                </div>
+                <div>
+                    <label>PDF file <InputFile @key="FileInputKey" OnChange="OnFileSelected" accept=".pdf" /></label>
+                    @if (FileError is not null)
+                    {
+                        <p class="validation-message">@FileError</p>
+                    }
+                </div>
+                <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedBytes is null)" @onclick="UploadAsync"><Icon Name="upload" />@(IsBusy ? "Uploading..." : "Upload inspection")</button>
+            </div>
+        }
+    }
+
+    @if (Inspections is null || Inspections.Count == 0)
+    {
+        <p>No inspection records yet.</p>
+    }
+    else
+    {
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Kind</th>
+                        <th>Note</th>
+                        <th>Uploaded by</th>
+                        <th>Last edited</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Inspections)
+                    {
+                        @if (EditingId == item.Id)
+                        {
+                            <tr>
+                                <td colspan="6">
+                                    <EditForm Model="EditModel" OnValidSubmit="() => SaveEditAsync(item.Id)">
+                                        <DataAnnotationsValidator />
+                                        <ValidationSummary />
+                                        <div>
+                                            <label>Inspection date <InputDate @bind-Value="EditModel.InspectionDate" /></label>
+                                        </div>
+                                        <div>
+                                            <label>Note <InputTextArea @bind-Value="EditModel.Note" maxlength="1000" /></label>
+                                        </div>
+                                        <div class="button-row">
+                                            <button type="submit" class="btn btn-primary" disabled="@IsBusy"><Icon Name="check-circle" />@(IsBusy ? "Saving..." : "Save")</button>
+                                            <button type="button" class="btn btn-ghost-light" @onclick="CancelEdit"><Icon Name="x" />Cancel</button>
+                                        </div>
+                                    </EditForm>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            <tr>
+                                <td>@item.InspectionDate.ToString("d MMM yyyy")</td>
+                                <td>@InspectionKinds.DisplayName(item.Kind)</td>
+                                <td>@item.Note</td>
+                                <td>@item.UploadedByEmail</td>
+                                <td>@LastEditedLabel(item)</td>
+                                <td>
+                                    <a class="open-link" href="/inspections/@item.Id/content" target="_blank" rel="noopener noreferrer">Open<Icon Name="external-link" /></a>
+                                    @if (CanEdit(item))
+                                    {
+                                        <button class="btn btn-ghost-light" @onclick="() => StartEdit(item)"><Icon Name="pencil" />Edit</button>
+                                    }
+                                    @if (CallerRole == Roles.Admin)
+                                    {
+                                        <button class="btn btn-danger" disabled="@IsBusy" @onclick="() => RequestDelete(item)"><Icon Name="trash-2" />Delete</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <p><a class="open-link" href="/e/@Equipment.Id/inspections" target="_blank" rel="noopener noreferrer">Public inspections page<Icon Name="external-link" /></a></p>
+
+    <ConfirmDialog @ref="DeleteConfirm"
+                    Title="Delete this inspection record?"
+                    Message="@($"The {(PendingDelete is not null ? InspectionKinds.DisplayName(PendingDelete.Kind) : "")} inspection from {PendingDelete?.InspectionDate} will be permanently removed.")"
+                    ConfirmText="Delete"
+                    OnConfirmed="DeleteAsync" />
+}
+
+@if (Error is not null)
+{
+    <p class="error"><Icon Name="x-circle" />@Error</p>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    protected override string[] AllowedRoles => [Roles.Admin, Roles.Operator, Roles.Reader];
+
+    private Equipment? Equipment;
+    private List<InspectionListItem>? Inspections;
+    private string? CallerRole;
+    private string? CallerEmail;
+    private string? Error;
+    private bool IsBusy;
+
+    private string NewKind = InspectionKinds.Monthly;
+    private DateOnly NewDate = BusinessTime.Today();
+    private string? NewNote;
+    private Guid FileInputKey = Guid.NewGuid();
+    private byte[]? SelectedBytes;
+    private string? SelectedContentType;
+    private string? SelectedFileName;
+    private string? FileError;
+
+    private Guid? EditingId;
+    private readonly EditInspectionModel EditModel = new();
+
+    private ConfirmDialog? DeleteConfirm;
+    private InspectionListItem? PendingDelete;
+
+    private bool CanManageInspections => CallerRole == Roles.Admin || CallerRole == Roles.Operator;
+
+    private bool CanEdit(InspectionListItem item) =>
+        CallerRole == Roles.Admin ||
+        (CallerRole == Roles.Operator && string.Equals(item.UploadedByEmail, CallerEmail, StringComparison.OrdinalIgnoreCase));
+
+    private static string LastEditedLabel(InspectionListItem item) =>
+        item.LastEditedAtUtc is null
+            ? ""
+            : $"{item.LastEditedByEmail} ({BusinessTime.ToBusiness(item.LastEditedAtUtc.Value):d MMM yyyy})";
+
+    protected override async Task OnAuthorizedInitializedAsync(AppDbContext db)
+    {
+        var authState = await AuthenticationStateTask!;
+        var caller = await UserAuthorization.FindAsync(authState.User.FindFirst(ClaimTypes.Email)?.Value, db);
+        CallerRole = caller?.Role;
+        CallerEmail = caller?.Email;
+
+        Equipment = await db.Equipment.FindAsync(Id);
+        if (Equipment is not null)
+        {
+            Inspections = await InspectionCatalog.ListAsync(Id, db);
+        }
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        FileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, UploadKind.Inspection);
+        if (FileError is not null)
+        {
+            SelectedBytes = null;
+            return;
+        }
+
+        using var stream = file.OpenReadStream(maxAllowedSize: DocumentUpload.MaxInspectionBytes);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        SelectedBytes = ms.ToArray();
+        SelectedContentType = file.ContentType;
+        SelectedFileName = file.Name;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (SelectedBytes is null)
+        {
+            return;
+        }
+
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await InspectionCatalog.AddAsync(
+                Id, NewKind, NewDate, NewNote, SelectedBytes, SelectedContentType!, SelectedFileName!, CallerEmail!, db);
+
+            switch (result)
+            {
+                case InspectionResult.Success success:
+                    Inspections = await InspectionCatalog.ListAsync(Id, db);
+                    NewKind = InspectionKinds.Monthly;
+                    NewDate = BusinessTime.Today();
+                    NewNote = null;
+                    SelectedBytes = null;
+                    SelectedContentType = null;
+                    SelectedFileName = null;
+                    FileInputKey = Guid.NewGuid();
+                    Toast.Success("Inspection record uploaded.");
+                    break;
+                case InspectionResult.InvalidFile invalid:
+                    Error = invalid.Reason;
+                    Toast.Error(Error);
+                    break;
+                case InspectionResult.InvalidRequest invalid:
+                    Error = invalid.Reason;
+                    Toast.Error(Error);
+                    break;
+                case InspectionResult.Forbidden forbidden:
+                    Error = forbidden.Reason;
+                    Toast.Error(Error);
+                    break;
+                default:
+                    Error = "Could not upload inspection record.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void StartEdit(InspectionListItem item)
+    {
+        EditingId = item.Id;
+        EditModel.InspectionDate = item.InspectionDate;
+        EditModel.Note = item.Note;
+    }
+
+    private void CancelEdit()
+    {
+        EditingId = null;
+    }
+
+    private async Task SaveEditAsync(Guid inspectionId)
+    {
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await InspectionCatalog.EditAsync(
+                inspectionId, EditModel.InspectionDate, EditModel.Note, CallerEmail!, CallerRole!, db);
+
+            switch (result)
+            {
+                case InspectionResult.Success:
+                    Inspections = await InspectionCatalog.ListAsync(Id, db);
+                    EditingId = null;
+                    Toast.Success("Inspection record updated.");
+                    break;
+                case InspectionResult.InvalidRequest invalid:
+                    Error = invalid.Reason;
+                    Toast.Error(Error);
+                    break;
+                case InspectionResult.Forbidden forbidden:
+                    Error = forbidden.Reason;
+                    Toast.Error(Error);
+                    break;
+                default:
+                    Error = "Could not update inspection record.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void RequestDelete(InspectionListItem item)
+    {
+        PendingDelete = item;
+        DeleteConfirm!.Show();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (PendingDelete is null)
+        {
+            return;
+        }
+
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await InspectionCatalog.DeleteAsync(PendingDelete.Id, db);
+            switch (result)
+            {
+                case InspectionResult.Success:
+                    Inspections = await InspectionCatalog.ListAsync(Id, db);
+                    Toast.Success("Inspection record deleted.");
+                    break;
+                default:
+                    Error = "Could not delete inspection record.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+            PendingDelete = null;
+        }
+    }
+
+    private sealed class EditInspectionModel
+    {
+        public DateOnly InspectionDate { get; set; }
+        public string? Note { get; set; }
+    }
+}

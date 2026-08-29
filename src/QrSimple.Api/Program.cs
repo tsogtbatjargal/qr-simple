@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
@@ -131,8 +132,82 @@ app.MapGet("/e/{id}", async (Guid id, AppDbContext db) =>
     }
 
     var documents = await db.Documents.Where(d => d.EquipmentId == id).ToListAsync();
+    var inspectionCount = await InspectionCatalog.CountAsync(id, db);
 
-    return Results.Content(ScanPage.Render(equipment, documents), "text/html");
+    return Results.Content(ScanPage.Render(equipment, documents, inspectionCount), "text/html");
+});
+
+// No RequireAuthorization/RequireRoleFilter — decision 10 in docs/plans/0002-inspection-records.md,
+// identical exposure to GET /e/{id} and GET /documents/{id}/content: anyone holding the QR
+// code reads this with no account, no login.
+app.MapGet("/e/{id}/inspections", async (Guid id, AppDbContext db) =>
+{
+    var equipment = await db.Equipment.FindAsync(id);
+    if (equipment is null)
+    {
+        return Results.NotFound();
+    }
+
+    var inspections = await InspectionCatalog.ListAsync(id, db);
+    return Results.Content(InspectionsPage.Render(equipment, inspections, BusinessTime.Today()), "text/html");
+});
+
+app.MapPost("/equipment/{id}/inspections", async (
+    Guid id, IFormFile file, HttpRequest request, ClaimsPrincipal principal, AppDbContext db) =>
+{
+    var kind = request.Form["kind"].ToString();
+    var note = request.Form["note"].ToString();
+    if (!DateOnly.TryParse(request.Form["inspectionDate"], CultureInfo.InvariantCulture, out var inspectionDate))
+    {
+        return Results.BadRequest(new { error = "Invalid or missing inspection date." });
+    }
+
+    var uploadedByEmail = principal.FindFirstValue(ClaimTypes.Email)!;
+
+    await using var stream = file.OpenReadStream();
+    using var ms = new MemoryStream();
+    await stream.CopyToAsync(ms);
+
+    var result = await InspectionCatalog.AddAsync(
+        id, kind, inspectionDate, note, ms.ToArray(), file.ContentType, file.FileName, uploadedByEmail, db);
+    return result.ToHttpResult(inspection => Results.Created($"/equipment/{id}/inspections/{inspection.Id}", inspection));
+}).DisableAntiforgery().RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
+
+app.MapPut("/inspections/{id}", async (Guid id, UpdateInspectionRequest request, ClaimsPrincipal principal, AppDbContext db) =>
+{
+    var caller = await UserAuthorization.FindAsync(principal.FindFirstValue(ClaimTypes.Email), db);
+    var result = await InspectionCatalog.EditAsync(id, request.InspectionDate, request.Note, caller!.Email, caller.Role, db);
+    return result.ToHttpResult(Results.Ok);
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
+
+// Admin-only, unlike DELETE /equipment/{id}/documents/{documentId} (Admin+Operator) — decision
+// 12: an Operator hard-deleting an inspection they filed would defeat the provenance trail the
+// UploadedByEmail/UploadedAtUtc fields exist to preserve.
+app.MapDelete("/equipment/{id}/inspections/{inspectionId}", async (Guid id, Guid inspectionId, AppDbContext db) =>
+{
+    var result = await InspectionCatalog.DeleteAsync(inspectionId, db);
+    return result.ToHttpResult(_ => Results.NoContent());
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
+
+// No RequireAuthorization/RequireRoleFilter — decision 10, matching GET /documents/{id}/content.
+app.MapGet("/inspections/{id}/content", async (Guid id, HttpContext context, AppDbContext db) =>
+{
+    var result = await InspectionCatalog.GetContentAsync(id, db);
+    if (result is not InspectionResult.Success success)
+    {
+        return Results.NotFound();
+    }
+
+    var inspection = success.Inspection;
+    var equipment = await db.Equipment.FindAsync(inspection.EquipmentId);
+
+    // Implementation trap (see ContentDisposition.cs): do not pass fileDownloadName to
+    // Results.File below — that forces Content-Disposition: attachment and stops phones
+    // displaying the PDF inline. Set the header manually instead.
+    context.Response.Headers["Content-Disposition"] =
+        ContentDisposition.BuildInlineHeader(equipment?.Name ?? "Equipment", inspection.Kind, inspection.InspectionDate);
+
+    return Results.File(inspection.Content, inspection.ContentType);
 });
 
 app.MapPost("/equipment/{id}/documents", async (Guid id, IFormFile file, HttpRequest request, AppDbContext db) =>
@@ -266,5 +341,6 @@ public record CreateEquipmentRequest(string Name, string Category, string Serial
 record AddCategoryRequest(string Name);
 record AddUserRequest(string Email, string Role);
 record UpdateUserRoleRequest(string Role);
+record UpdateInspectionRequest(DateOnly InspectionDate, string? Note);
 
 public partial class Program;

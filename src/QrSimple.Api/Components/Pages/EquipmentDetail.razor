@@ -199,6 +199,9 @@ else
         </div>
     }
 
+    <h2><Icon Name="clipboard-check" />Inspections</h2>
+    <p><a class="open-link" href="/app/equipment/@Item.Id/inspections">Manage inspection records<Icon Name="chevron-right" /></a></p>
+
     <img class="qr-code" src="/equipment/@Item.Id/qr" alt="QR code for @Item.Name" width="240" height="240" />
     <p><a class="open-link" href="/e/@Item.Id" target="_blank" rel="noopener noreferrer">Public scan page<Icon Name="external-link" /></a></p>
 
@@ -285,7 +288,7 @@ else
     private async Task OnPhotoFileSelected(InputFileChangeEventArgs e)
     {
         var file = e.File;
-        PhotoFileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, isPhoto: true);
+        PhotoFileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, UploadKind.Photo);
         if (PhotoFileError is not null)
         {
             SelectedPhotoBytes = null;
@@ -354,7 +357,7 @@ else
     private async Task OnDocumentFileSelected(InputFileChangeEventArgs e)
     {
         var file = e.File;
-        DocumentFileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, isPhoto: false);
+        DocumentFileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, UploadKind.Document);
         if (DocumentFileError is null && DocumentCatalog.IsPhotoLabel(Path.GetFileNameWithoutExtension(file.Name)))
         {
             DocumentFileError = "That file name is reserved for the equipment photo. Rename the file, or use the Photo section above.";

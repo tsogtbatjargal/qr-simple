@@ -184,6 +184,32 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    // Equipment with inspection records but no Documents must not show the "no documents"
+    // empty state — the inspections panel alone is enough content for the .documents nav.
+    [Fact]
+    public async Task Scan_page_does_not_show_no_documents_message_when_only_inspections_exist()
+    {
+        var client = factory.CreateClientAs("Operator");
+
+        var createResponse = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Inspection Only Pump",
+            category = "Pump",
+            serialNumber = "IOP-0001",
+            site = "North Pit",
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        using var inspectionContent = TestUploads.Inspection();
+        var uploadResponse = await client.PostAsync($"/equipment/{created!.Id}/inspections", inspectionContent);
+        Assert.True(uploadResponse.IsSuccessStatusCode);
+
+        var html = await client.GetStringAsync($"/e/{created.Id}");
+
+        Assert.DoesNotContain("No documents are available", html);
+        Assert.Contains("Inspection records (1)", html);
+    }
+
     private sealed record CreatedEquipment(Guid Id);
     private sealed record CreatedDocument(Guid Id);
 }

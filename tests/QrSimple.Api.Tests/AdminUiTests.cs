@@ -185,5 +185,74 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.DoesNotContain("type=\"file\"", body);
     }
 
+    [Fact]
+    public async Task Operator_sees_the_inspection_upload_form_on_the_inspections_page()
+    {
+        var client = factory.CreateClientAs("Operator");
+        var created = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Inspections UI Truck",
+            category = "Truck",
+            serialNumber = "IUI-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
+
+        var response = await client.GetAsync($"/app/equipment/{equipment!.Id}/inspections");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Upload inspection", body);
+        Assert.Contains("type=\"file\"", body);
+    }
+
+    [Fact]
+    public async Task Reader_sees_the_inspections_page_read_only()
+    {
+        var adminClient = factory.CreateClientAs("Admin");
+        var created = await adminClient.PostAsJsonAsync("/equipment", new
+        {
+            name = "Reader Inspections Truck",
+            category = "Truck",
+            serialNumber = "RIT-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
+
+        using var content = TestUploads.Inspection(note: "Reader-visible inspection.");
+        await adminClient.PostAsync($"/equipment/{equipment!.Id}/inspections", content);
+
+        var readerClient = factory.CreateClientAs("Reader");
+        var response = await readerClient.GetAsync($"/app/equipment/{equipment.Id}/inspections");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Reader-visible inspection.", body);
+        Assert.DoesNotContain("Upload inspection", body);
+        Assert.DoesNotContain("type=\"file\"", body);
+    }
+
+    [Fact]
+    public async Task Unregistered_email_is_redirected_from_the_inspections_page()
+    {
+        var adminClient = factory.CreateClientAs("Admin");
+        var created = await adminClient.PostAsJsonAsync("/equipment", new
+        {
+            name = "Stranger Inspections Truck",
+            category = "Truck",
+            serialNumber = "SIT-0001",
+            site = "North Pit",
+        });
+        var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
+
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TestEmailHeader, "stranger-inspections@example.com");
+
+        var response = await client.GetAsync($"/app/equipment/{equipment!.Id}/inspections");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("http://localhost/app/not-authorized", response.Headers.Location?.OriginalString);
+    }
+
     private sealed record EquipmentResponse(Guid Id);
 }

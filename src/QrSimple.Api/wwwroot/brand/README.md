@@ -42,3 +42,11 @@ are all live.
 
 Upstream master copy of this kit lives outside the repo at
 `/home/tsogo/icsmongolia/brand-kit/`; keep the two in sync when either changes.
+That path is on a separate, not-version-controlled LXC container named
+`lxc-ics-mongolia`, not on this dev host/devcontainer's own filesystem — reach it
+with plain `ssh lxc-ics-mongolia`. Verified 2026-08-28: `tokens.css` and every
+runtime asset qr-simple actually references (fonts, icons, the shipped logos/
+favicons) are byte-identical between the two copies. The master also carries a
+few files qr-simple intentionally doesn't ship (another product's logo, two
+master-resolution source PNGs the shipped logo/favicons are derived from) —
+that's expected, not drift to fix.

@@ -8,6 +8,8 @@ Setting up a dev environment from scratch (new machine, or a devcontainer rebuil
 
 Picking up a piece of work that was planned out in a separate session before being handed to you? Check [docs/plans/](docs/plans/) first — [docs/plans/README.md](docs/plans/README.md) explains the workflow, and each numbered plan there is a scoped implementation spec (decisions, design sketch, verification checklist) with its own Log section for what actually happened. Append to that Log as you work; don't just report back in chat and let the trail disappear.
 
+**If a handoff describes uncommitted changes but `git status` shows a clean tree, `git fetch origin` before concluding the work doesn't exist.** Multiple agents/sessions (Codex and Claude Code, devcontainer and bare-host) work this repo in parallel and hand work between each other via out-of-band prompts, and a session's local clone doesn't automatically know about a branch another session pushed. Real incident, 2026-08-28: a rebrand handoff described 23 modified files sitting uncommitted in the working tree; `main` was actually clean, and the real work — committed, matching the description exactly — was sitting on `origin/rebrand/ics-brand-tokens`, a branch that simply hadn't been fetched yet. Don't spend time concluding a briefing is "stale" or "for a different repo" before ruling this out with a fetch.
+
 ## Architecture
 
 ASP.NET Core minimal API (`src/QrSimple.Api`) + PostgreSQL via EF Core, tested at a single seam: real HTTP requests in-process (`WebApplicationFactory<Program>`) against a real containerized Postgres (Testcontainers) — no mocking, no unit tests below that seam. `tests/QrSimple.Api.Tests/ApiFactory.cs` is the fixture; every test class implements `IClassFixture<ApiFactory>`.

@@ -180,6 +180,12 @@ If you're verifying a client-side timer (e.g. a toast auto-dismissing after N mi
 
 ## Troubleshooting
 
+### The running API process isn't visible from this devcontainer's `ps`/`sudo ps`
+
+The port-sharing table above says the API runs "in VS Code devcontainer," but in practice the process that's actually bound to 5078/7040 may belong to a *different* devcontainer instance or terminal (yours, or another agent's) than the one the current agent is in — `--network=host` means every container on the Fedora host shares the same loopback and can `curl` the same ports, but each devcontainer instance still has its own PID namespace. `ps aux`, `sudo ps aux`, and even matching `/proc/net/tcp` socket inodes against every `/proc/[0-9]*/fd` in this container can all come up completely empty for a process that is demonstrably answering on those ports. This is not a permissions bug — the process genuinely isn't in this container's PID namespace, so it cannot be killed or restarted from here.
+
+Don't burn time hunting for it (repeated `ps`/`lsof`/`fuser`/`sudo` variants, `/proc` scans) once a straightforward `ps aux | grep dotnet` and a socket-inode cross-check both come back empty — that's already the answer. Confirm build freshness instead by fetching the live page and grepping the response for a string unique to the new code (e.g. a new CSS rule or literal added in the change), and if it's stale, ask the user to restart the process themselves in whichever terminal owns it (discrete kill → confirm-port-free → relaunch → poll-log, per the section above) rather than trying to signal it from an agent session that can't see it.
+
 ### Codex lists Playwright but exposes no browser tools
 
 1. Confirm `.codex/config.toml` contains `url = "http://127.0.0.1:8931/mcp"`.
@@ -188,7 +194,13 @@ If you're verifying a client-side timer (e.g. a toast auto-dismissing after N mi
 4. Restart only the Codex extension and open a new agent.
 5. Do not change the MCP command to `/var/home/...`; that path is outside the devcontainer.
 
-### Chrome CDP is unavailable on port 9222
+### Claude Code shows `playwright`/`qr_simple` as "failed to connect" even after you start the host stack
+
+A Claude Code session resolves its configured MCP servers (`.mcp.json`) once, at session start. If Chrome/the Playwright MCP service/the project MCP weren't up yet at that moment, the session records those servers as failed and does **not** retry — bringing up `./scripts/start-chrome-for-playwright.sh` and `./scripts/start-qr-simple-mcp.sh` afterward, and confirming with the readiness `curl`s that they're genuinely listening, does not make the tools reappear mid-session. `ToolSearch` for `browser_navigate`/etc. keeps coming back empty even though `curl http://127.0.0.1:9222/json/version` and `curl -o /dev/null -w '%{http_code}' http://127.0.0.1:8931/mcp` both succeed. This is a one-time-resolution problem, not a stale-cache one you can force-refresh from inside the session.
+
+Fix: start the host stack first, *then* start or restart the Claude Code session (this is the Claude-specific equivalent of "restart only the Codex extension" below — same root cause, different client). If you're mid-session and can't restart it, hand the live-browser-verification step to a different session/agent that starts after the stack is up (e.g. the devcontainer's own Codex/Claude agent), rather than trying to coax the current session's MCP connections back to life.
+
+### Codex lists Playwright but exposes no browser tools
 
 Run `./scripts/start-chrome-for-playwright.sh` from a Fedora host terminal. The Flatpak Chrome GUI cannot be started directly by an unprivileged in-devcontainer process.
 

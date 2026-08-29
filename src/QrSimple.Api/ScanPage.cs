@@ -79,12 +79,11 @@ public static class ScanPage
             main { width: min(100%, 760px); min-height: 100vh; margin: 0 auto; padding: clamp(12px, 3vw, 24px); }
             .stack { display: grid; gap: 14px; }
             .photo { min-height: 220px; display: grid; place-items: center; padding: 18px; background: var(--brand-primary); border-radius: 18px; box-shadow: var(--brand-shadow-md); }
-            .photo-frame { width: min(100%, 340px); aspect-ratio: 16 / 10; display: grid; place-items: center; overflow: hidden; background: var(--brand-surface); border-radius: 12px; }
-            .photo img { width: 100%; height: 100%; object-fit: contain; }
+            .photo-frame { width: min(100%, 340px); aspect-ratio: 16 / 10; display: grid; place-items: center; overflow: hidden; background: var(--brand-surface); border-radius: 12px; padding: 16px; }
+            .photo img { max-width: 100%; max-height: 100%; object-fit: contain; }
             .placeholder { width: 74%; max-height: 78%; color: var(--brand-primary); }
             .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: var(--brand-primary); color: white; text-align: center; box-shadow: var(--brand-shadow-md); }
             h1 { margin: 0; font-size: clamp(1.55rem, 6vw, 2.25rem); line-height: 1.15; font-weight: 700; }
-            .category { font-size: clamp(1.25rem, 5vw, 1.75rem); font-weight: 600; }
             .documents { display: grid; gap: 14px; }
             .document { position: relative; gap: 14px; padding-inline: 56px; font-size: clamp(1.2rem, 5vw, 1.65rem); font-weight: 600; text-decoration: none; transition: transform .15s ease, background .15s ease; }
             .document .icon { font-size: 1.1em; }
@@ -107,6 +106,7 @@ public static class ScanPage
                 main { padding: 10px; }
                 .stack, .documents { gap: 10px; }
                 .photo { min-height: 190px; border-radius: 12px; }
+                .photo-frame { padding: 10px; }
                 .panel { min-height: 76px; border-radius: 10px; }
                 .document { padding-inline: 46px; gap: 10px; }
                 .arrow { right: 16px; }
@@ -139,13 +139,13 @@ public static class ScanPage
                             <div class="photo-frame">{equipmentImage}</div>
                         </section>
                         <section class="panel"><h1>{Encode(equipment.Name)}</h1></section>
-                        <section class="panel category">{Encode(equipment.Category)}</section>
                         {retiredNotice}
                         {documentsSection}
                     </div>
                     <section class="details" aria-labelledby="details-heading">
                         <h2 id="details-heading">Equipment details</h2>
                         <dl>
+                            <dt>Category</dt><dd>{Encode(equipment.Category)}</dd>
                             <dt>Serial/Asset Number</dt><dd>{Encode(equipment.SerialNumber)}</dd>
                             <dt>Site</dt><dd>{Encode(equipment.Site)}</dd>
                             <dt>Status</dt><dd>{Encode(equipment.Status.ToString())}</dd>

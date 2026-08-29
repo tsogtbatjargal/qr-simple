@@ -80,7 +80,7 @@ public static class ScanPage
             .stack { display: grid; gap: 14px; }
             .photo { min-height: 220px; display: grid; place-items: center; padding: 18px; background: var(--brand-primary); border-radius: 18px; box-shadow: var(--brand-shadow-md); }
             .photo-frame { width: min(100%, 340px); aspect-ratio: 16 / 10; display: grid; place-items: center; overflow: hidden; background: var(--brand-surface); border-radius: 12px; padding: 16px; }
-            .photo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+            .photo img { width: 100%; height: 100%; object-fit: contain; }
             .placeholder { width: 74%; max-height: 78%; color: var(--brand-primary); }
             .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: var(--brand-primary); color: white; text-align: center; box-shadow: var(--brand-shadow-md); }
             h1 { margin: 0; font-size: clamp(1.55rem, 6vw, 2.25rem); line-height: 1.15; font-weight: 700; }

@@ -79,8 +79,8 @@ public static class ScanPage
             main { width: min(100%, 760px); min-height: 100vh; margin: 0 auto; padding: clamp(12px, 3vw, 24px); }
             .stack { display: grid; gap: 14px; }
             .photo { min-height: 220px; display: grid; place-items: center; padding: 18px; background: var(--brand-primary); border-radius: 18px; box-shadow: var(--brand-shadow-md); }
-            .photo-frame { width: min(100%, 340px); aspect-ratio: 16 / 10; display: grid; place-items: center; overflow: hidden; background: var(--brand-surface); border-radius: 12px; padding: 16px; }
-            .photo img { width: 100%; height: 100%; object-fit: contain; }
+            .photo-frame { width: min(100%, 340px); aspect-ratio: 16 / 10; display: grid; grid-template-rows: 1fr; grid-template-columns: 1fr; place-items: center; overflow: hidden; background: var(--brand-surface); border-radius: 12px; padding: 16px; }
+            .photo img { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; }
             .placeholder { width: 74%; max-height: 78%; color: var(--brand-primary); }
             .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: var(--brand-primary); color: white; text-align: center; box-shadow: var(--brand-shadow-md); }
             h1 { margin: 0; font-size: clamp(1.55rem, 6vw, 2.25rem); line-height: 1.15; font-weight: 700; }

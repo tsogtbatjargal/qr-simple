@@ -33,9 +33,9 @@ That one command:
 
 1. Starts the existing `qr-simple-db` container when it exists.
 2. Starts or replaces the host-networked Playwright MCP service.
-3. Opens visible Flatpak Chrome with its disposable CDP profile.
+3. Opens visible Flatpak Chrome with its disposable CDP profile, and **keeps it alive** — the command does not return, it stays in the foreground restarting Chrome if it ever exits (see the CDP troubleshooting entry below for why that's necessary).
 
-Leave that Chrome window open.
+Leave that terminal running. Add `--detach` if you'd rather it run in the background (`./scripts/start-chrome-for-playwright.sh --detach`), which is the right form when an agent starts it from the host. Closing the Chrome window is no longer fatal — the keeper reopens it within a few seconds.
 
 Next, open the repository in VS Code and reopen it in the devcontainer. In a **devcontainer terminal**, start the API:
 
@@ -200,9 +200,25 @@ A Claude Code session resolves its configured MCP servers (`.mcp.json`) once, at
 
 Fix: start the host stack first, *then* start or restart the Claude Code session (this is the Claude-specific equivalent of "restart only the Codex extension" below — same root cause, different client). If you're mid-session and can't restart it, hand the live-browser-verification step to a different session/agent that starts after the stack is up (e.g. the devcontainer's own Codex/Claude agent), rather than trying to coax the current session's MCP connections back to life.
 
-### Codex lists Playwright but exposes no browser tools
+### Chrome can't be started from inside the devcontainer
 
 Run `./scripts/start-chrome-for-playwright.sh` from a Fedora host terminal. The Flatpak Chrome GUI cannot be started directly by an unprivileged in-devcontainer process.
+
+### Chrome CDP (9222) dies partway through a verification run
+
+Symptom: the Playwright MCP tools resolve fine, but `browser_navigate` starts failing with `ECONNREFUSED 127.0.0.1:9222` mid-session. `chrome.log` just stops — no crash, no error explaining it. A process check is misleading here: `pgrep -f com.google.Chrome` can still match leftover `chrome_crashpad_handler` helpers after the actual browser is gone, so it looks alive. Check `pgrep -f "remote-debugging-port"` or `ss -ltnp | grep 9222` instead.
+
+Cause: **Chrome quits when its last tab closes, and Playwright closes pages as it drives the browser.** The old version of `scripts/start-chrome-for-playwright.sh` ended in `exec flatpak run com.google.Chrome ... about:blank`, so once automation closed that final tab the whole browser exited and took CDP with it. Closing the visible window by hand does the same thing.
+
+Fix (already in the script as of 2026-08-29): Chrome is launched with `--keep-alive-for-test`, its own automation flag that keeps the browser process alive with zero windows, and the script now runs as a **keeper loop** rather than `exec`ing Chrome — so any other exit (window closed, real crash) is followed by a relaunch about 3 seconds later. It gives up after five immediate consecutive exits rather than spinning forever on a genuinely broken Chrome.
+
+Consequences worth knowing:
+
+- **The script no longer returns.** It stays in the foreground; leave the terminal running, or start it with `./scripts/start-chrome-for-playwright.sh --detach` (logs to `/tmp/qr-simple-chrome-keeper.log`, stop with `pkill -f "start-chrome-for-playwrigh[t]"`). `--detach` is the right form for an agent driving this from the host, because a keeper started from an ordinary agent shell dies with that shell's process group.
+- **Running it twice is now a no-op** — it detects a live CDP on 9222 and refuses, instead of starting a second Chrome that fights the first for the port.
+- **If CDP does blink mid-run, wait a few seconds and reconnect** rather than asking for a manual restart; the keeper will already have brought it back. The profile lives on disk at `/tmp/qr-simple-chrome-playwright-profile`, so a signed-in Google session survives a keeper restart.
+
+Shell gotcha when cleaning any of this up from an agent session: `pkill -f "remote-debugging-port=9222"` **matches its own shell's command line** and kills the invocation that ran it (exit code 144, command appears to die for no reason). Use a bracket to break the self-match — `pkill -f "remote-debugging-port=922[2]"` — the same trick the `--detach` output suggests.
 
 ### API fails to connect to `127.0.0.1:5432`
 
@@ -226,7 +242,7 @@ This was a Flatpak-to-host Podman event race. `scripts/podman-for-vscode.sh` add
 ## Relevant files
 
 - `.codex/config.toml` — project-scoped HTTP MCP registration.
-- `scripts/start-chrome-for-playwright.sh` — one host command for the database, MCP service, and disposable Chrome.
+- `scripts/start-chrome-for-playwright.sh` — one host command for the database, MCP service, and disposable Chrome. Runs as a foreground keeper that restarts Chrome if it exits; takes `--detach`.
 - `scripts/start-playwright-mcp-service.sh` — Playwright MCP Podman service definition.
 - `.playwright-mcp-output/` — gitignored; screenshots/PDFs/videos/snapshots written by the Playwright MCP service, readable from host and devcontainer alike.
 - `.devcontainer/devcontainer.json` — host networking and Podman socket setup.

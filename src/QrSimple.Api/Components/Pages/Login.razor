@@ -1,0 +1,74 @@
+@page "/login"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+
+@*
+    The app's own sign-in page. Before this existed, "/login" was a bare Results.Challenge in
+    Program.cs, so every route into it — including POST /logout's redirect — dumped the user
+    straight onto Google's account screen with no ICS branding in between.
+
+    The provider buttons submit forms rather than being plain links, and that is load-bearing:
+    Blazor's client-side router intercepts <a> clicks to same-origin URLs, and "/login/{scheme}"
+    has no @@page, so an anchor would render the NotFound page instead of ever reaching the
+    server. Form posts are not intercepted — the same reason MainLayout's sign-out is a form.
+*@
+
+<PageTitle>Sign in — ICS Equipment Registry</PageTitle>
+
+@{
+    var notice = Notice;
+}
+
+<div class="login-card">
+    <img class="login-logo" src="/brand/logos/ics-logo.png" alt="ICS Mongolia" width="1381" height="678" />
+    <h1>Equipment Registry</h1>
+
+    @if (notice is not null)
+    {
+        <p class="login-notice @notice.CssClass" role="status">
+            <Icon Name="@notice.Icon" />@notice.Text
+        </p>
+    }
+
+    <div class="login-providers">
+        @foreach (var provider in LoginProviders.All)
+        {
+            <form method="post" action="@ChallengeAction(provider)" class="login-provider-form">
+                <button type="submit" class="btn btn-primary login-provider">
+                    <Icon Name="@provider.Icon" />@provider.DisplayName
+                </button>
+            </form>
+        }
+    </div>
+
+    <p class="login-footnote">
+        Access is by invitation. If your account isn't set up yet, ask an admin to add you from
+        the Users page.
+    </p>
+</div>
+
+@code {
+    // Both arrive as query-string flags rather than as state passed between components, because
+    // /login is reached by a plain HTTP redirect from three places that share no circuit with this
+    // page: POST /logout, the cookie scheme's LoginPath (which appends its own "ReturnUrl"), and
+    // Components/RedirectToLogin.razor. A new reason for landing here means a new flag plus a case
+    // in Notice below — that is the extension point, not a rewrite of the page.
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] public bool SignedOut { get; set; }
+
+    private LoginNotice? Notice =>
+        SignedOut ? new LoginNotice("You've been signed out.", "check-circle", "login-notice-ok")
+        : !string.IsNullOrEmpty(ReturnUrl) ? new LoginNotice("Please sign in to continue.", "log-in", "login-notice-info")
+        : null;
+
+    // ReturnUrl is passed straight through to the challenge endpoint, which is where it gets
+    // validated (LoginProviders.SafeReturnUrl) — never trust it here just because it round-tripped
+    // through a page of ours.
+    private string ChallengeAction(LoginProvider provider)
+    {
+        var target = $"/login/{provider.Scheme}";
+        return string.IsNullOrEmpty(ReturnUrl) ? target : $"{target}?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+    }
+
+    private sealed record LoginNotice(string Text, string Icon, string CssClass);
+}

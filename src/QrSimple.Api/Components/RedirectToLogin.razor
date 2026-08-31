@@ -3,6 +3,16 @@
 @code {
     protected override void OnInitialized()
     {
-        Navigation.NavigateTo("/login", forceLoad: true);
+        // Carries the current page through as ReturnUrl so the login page can send the user back
+        // where they were aiming. Capitalised to match the cookie scheme's own LoginPath redirect,
+        // which appends "ReturnUrl" — Login.razor then only has to read one spelling.
+        //
+        // forceLoad because the sign-in buttons on /login post to /login/{scheme}, a plain endpoint
+        // with no @page; arriving there through a client-side navigation leaves the router in a
+        // state where that post has nothing to render into.
+        var current = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var returnUrl = string.IsNullOrEmpty(current) ? "/app" : "/" + current;
+
+        Navigation.NavigateTo($"/login?ReturnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
     }
 }

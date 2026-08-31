@@ -3,7 +3,6 @@ using System.Security.Claims;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using QrSimple.Api;
@@ -85,15 +84,43 @@ app.UseAntiforgery();
 // the same publish-time manifest).
 app.MapStaticAssets();
 
-app.MapGet("/login", (string? returnUrl) =>
-    Results.Challenge(
-        new AuthenticationProperties { RedirectUri = returnUrl ?? "/app" },
-        [GoogleDefaults.AuthenticationScheme]));
+// The login *page* is a Blazor component (Components/Pages/Login.razor, route "/login"); this
+// endpoint is only what its buttons point at. The two can't be merged: a Blazor circuit has no way
+// to call Results.Challenge, which needs to write a redirect plus an OAuth correlation cookie onto
+// a real HttpResponse. Keep the two routes distinct or they collide on "/login".
+//
+// POST, not GET, because the page reaches it through a form: Blazor's client-side router
+// intercepts <a> clicks to same-origin URLs, so an anchor to this route -- which has no @page --
+// would render the NotFound component instead of ever reaching the server.
+app.MapPost("/login/{scheme}", (string scheme, string? returnUrl) =>
+{
+    var provider = LoginProviders.Find(scheme);
+    if (provider is null)
+    {
+        return Results.NotFound();
+    }
+
+    var properties = new AuthenticationProperties { RedirectUri = LoginProviders.SafeReturnUrl(returnUrl) };
+
+    // Without this, Google silently re-authenticates whatever session the browser still holds
+    // (prompt=none), so signing out and back in drops the user into the same account having never
+    // been asked -- and on a shared field tablet the next person inherits the previous user's
+    // session. docs/plans/0003-pluggable-authentication-provider.md decision 20 flagged that risk
+    // and accepted it; an explicit account picker costs one click and settles it. "prompt" is the
+    // parameter name under OIDC as well, so this survives the provider swap that plan describes.
+    properties.SetParameter("prompt", "select_account");
+
+    return Results.Challenge(properties, [provider.Scheme]);
+});
 
 app.MapPost("/logout", async (HttpContext ctx) =>
 {
     await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-    return Results.Redirect("/app");
+
+    // Deliberately not "/app": that page is [Authorize], so redirecting there sent the browser
+    // straight back out through the cookie scheme's LoginPath -- and while /login was still a bare
+    // challenge, on to Google's account screen. Signing out visibly failed to land anywhere.
+    return Results.Redirect("/login?signedOut=true");
 });
 
 app.MapRazorComponents<App>()

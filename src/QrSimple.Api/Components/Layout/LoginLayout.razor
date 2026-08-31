@@ -1,0 +1,11 @@
+@inherits LayoutComponentBase
+
+@*
+    Deliberately bare: no site header, no nav. MainLayout's header carries its own "Sign in"
+    button, which would otherwise sit directly above the card's sign-in button — the same
+    action offered twice on one screen. It also keeps the login page clear of the header
+    centering rules in app.css, since there is no header here to centre.
+*@
+<main class="login-page">
+    @Body
+</main>

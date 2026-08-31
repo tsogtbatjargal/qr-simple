@@ -2,6 +2,18 @@
 
 Status: Ready for implementation
 
+> **Amended 2026-08-31 — decisions 6 and 20 partially superseded by the login page.** The app now
+> has its own sign-in page (`Components/Pages/Login.razor`) driven by a `LoginProviders.All` list,
+> so the "this keeps `/login` a bare challenge with no provider-picker page (none exists today)"
+> half of **decision 6** no longer holds. Its substantive half stands unchanged: still exactly one
+> scheme *registered* per deployment, and decision 10 still rests on that. Adding OIDC is a second
+> `LoginProviders.All` entry alongside the `AddOpenIdConnect(...)` registration — `Login.razor`
+> loops and needs no edit. **Decision 20**'s *accepted consequence* is also reversed: the challenge
+> now sends `prompt=select_account`, so the IdP no longer silently re-authenticates after sign-out
+> and the shared-field-tablet risk that decision flagged is closed. Decision 20's actual rule is
+> untouched — sign-out remains local-cookie-only, with no RP-initiated federated logout. Body left
+> unedited below, per this folder's convention.
+
 ## Why
 
 Sign-in is hardcoded to Google. `Program.cs` registers exactly one external scheme (`.AddGoogle(...)`), and `/login` challenges it by name. A prospective customer running on Microsoft 365 cannot use this product at all, and "sign in with Google" on a corporate laptop reads as unserious to an enterprise IT department.

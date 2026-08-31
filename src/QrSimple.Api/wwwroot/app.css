@@ -431,6 +431,60 @@ h2 .icon { font-size: 1.15rem; color: var(--blue); }
 .toast-success { background: var(--brand-navy); }
 .toast-error { background: var(--danger); }
 
+/* ---- Login page ------------------------------------------------------------------
+   Components/Pages/Login.razor, rendered inside LoginLayout.razor. The one page in the
+   admin UI with no site header, so it does its own full-height centring rather than
+   inheriting .page / main.content. The slots below are named rather than positional:
+   a future auth change adds another .login-provider-form or a third .login-notice-*
+   variant, it doesn't restructure this block. */
+.login-page {
+    min-height: 100vh;
+    /* dvh so the card stays centred when a phone browser's URL bar shows and hides;
+       the 100vh line above is the fallback for browsers that don't know dvh. */
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    padding: clamp(24px, 6vw, 40px);
+}
+
+.login-logo { display: block; height: 46px; width: auto; margin: 0 auto 18px; }
+
+.login-card h1 { font-size: 1.35rem; margin: 0 0 22px; color: var(--brand-navy); }
+
+.login-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 20px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: .9rem;
+}
+
+.login-notice-ok { background: var(--tint); color: var(--blue-dark); }
+.login-notice-info { background: var(--surface-alt); color: var(--muted); border: 1px solid var(--border); }
+
+/* A column, so a second provider stacks under the first at full width instead of
+   fighting the first for the row. */
+.login-providers { display: flex; flex-direction: column; gap: 10px; }
+.login-provider-form { margin: 0; }
+.login-provider { width: 100%; }
+
+.login-footnote { margin: 22px 0 0; font-size: .85rem; line-height: 1.5; color: var(--muted); }
+
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
@@ -453,6 +507,8 @@ h2 .icon { font-size: 1.15rem; color: var(--blue); }
     dd + dt { margin-top: 8px; }
     th, td { padding: 10px 12px; font-size: .9rem; }
     .not-authorized-card, .not-found-card { margin: 24px auto; }
+    .login-page { padding: 16px; }
+    .login-logo { height: 38px; }
     .toast-host { top: 12px; left: 12px; right: 12px; transform: none; align-items: stretch; }
     .toast { text-align: center; }
     .modal-actions { flex-direction: column-reverse; }

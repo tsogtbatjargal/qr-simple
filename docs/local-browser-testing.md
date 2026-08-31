@@ -122,14 +122,16 @@ Other gotchas specific to this flow:
   `browser_evaluate` page-context `fetch()` call from a tab that's already signed in (it
   automatically carries the session cookie) — don't try to fake an identity header against the
   live server.
-- A page that still shows the user as logged in right after clicking "Sign out" is **not proof
-  sign-out failed**. Chrome's live Google SSO session will silently re-authenticate via
-  `prompt=none` on the very next request that needs auth, making a working sign-out look broken.
-  To verify sign-out actually worked, hit a protected endpoint (e.g. `/me`) right after and check
-  it starts a fresh auth challenge, or inspect `browser_network_requests` for the full redirect
-  chain (`/app` → 302 → `/login` → Google `prompt=none` silent re-auth → back to `/app` 200 is the
-  *expected*, correct sequence — not a bug) — don't trust what the rendered page shows moments
-  later.
+- **Sign-out changed on 2026-08-31; the warning that used to sit here no longer applies.** Clicking
+  "Sign out" now lands on the app's own login page at `/login?signedOut=true` — ICS logo,
+  "Equipment Registry", and a "You've been signed out." banner — instead of bouncing on to Google.
+  The sign-in button challenges with `prompt=select_account`, so Google shows the account picker
+  rather than silently re-authenticating the live SSO session. Signing out and straight back in
+  should therefore *require* an explicit account choice; landing back in the previous account with
+  no prompt **is** a bug now. Historical note, in case you're reading an older transcript: before
+  that change, `/app` → 302 → `/login` → Google `prompt=none` silent re-auth → back to `/app` 200
+  was the expected sequence, and a page still showing the user signed in right after sign-out was
+  not proof of failure.
 
 ## Restarting the API after a code change
 

@@ -13,7 +13,7 @@ This plan reverses or corrects four things existing docs assert:
 - **`AGENTS.md`'s v1 non-goals list includes "non-Google sign-in."** That is exactly what this adds. Amend the line rather than deleting it, noting it was reversed by this plan.
 - **`docs/adr/0001-organization-modeled-from-day-one.md` and `CONTEXT.md` both state that `Organization` is a modeled entity and that every Equipment and User references one. This is false.** There is no `Organization.cs`, no `OrganizationId` column anywhere, no `DbSet<Organization>`, and no mention of it across any of the four migrations. The only surviving trace is a comment in `BusinessTime.cs:9-12` that reasons from the ADR as though the table existed. The ADR's stated purpose was to avoid an expensive backfill later; the backfill was never avoided because the work was never done.
 - **The multi-tenancy strategy that ADR 0001 assumed is being replaced** (decision 2): per-customer deployments rather than one shared instance. That makes the missing `Organization` table moot rather than urgent, but the docs still need to stop describing code that does not exist.
-- **`CONTEXT.md`'s Document/Inspection sections are unaffected.** Nothing here touches attachments.
+- **`CONTEXT.md`'s Document/Rebuild sections are unaffected.** Nothing here touches attachments.
 
 ## Settled decisions
 
@@ -47,7 +47,7 @@ Settled with the project owner across four grilling rounds on 2026-08-29. Each i
 
 11. **Map the email claim defensively, and fail closed.** Google always emits `ClaimTypes.Email`; **Entra frequently does not** — a work account typically carries `preferred_username` (the UPN), and `email` appears only if the app registration adds it as an optional claim or the directory account has a `mail` attribute. Since every authorization decision keys on `ClaimTypes.Email`, an absent claim silently 403s every user. Resolve in this order: `email` → `preferred_username`. **If neither is present, fail the sign-in with an explicit error** rather than admitting a principal with no email, which would surface as an inexplicable 403 in front of a customer. Request the `email` scope and configure the optional claim in the app registration as well — the fallback is a safety net, not the plan.
 
-12. **Normalize email to lowercase on both write and lookup.** Entra returns the UPN with whatever casing the directory holds, so `Tsogt.B@company.com` is entirely possible; an Admin who invited `tsogt.b@company.com` would create a row that never matches. Lowercase in `UserCatalog.CreateAsync` and in `UserAuthorization.FindAsync`. Note the codebase is currently inconsistent about this: `InspectionCatalog.cs:124` and `EquipmentInspections.razor:168` already compare emails with `OrdinalIgnoreCase`, but the identity lookup that gates every request does not. **Before shipping, check the live `Users` table for rows differing only by case** — the unique index would block the migration. If any exist, stop and ask rather than picking a winner.
+12. **Normalize email to lowercase on both write and lookup.** Entra returns the UPN with whatever casing the directory holds, so `Tsogt.B@company.com` is entirely possible; an Admin who invited `tsogt.b@company.com` would create a row that never matches. Lowercase in `UserCatalog.CreateAsync` and in `UserAuthorization.FindAsync`. Note the codebase is currently inconsistent about this: `RebuildCatalog.cs:192` and `EquipmentRebuilds.razor:208` already compare emails with `OrdinalIgnoreCase` (this entity shipped as `Inspection`/`InspectionCatalog.cs`/`EquipmentInspections.razor` and was renamed 2026-08-31 — re-verify these line numbers too, since renames drift), but the identity lookup that gates every request does not. **Before shipping, check the live `Users` table for rows differing only by case** — the unique index would block the migration. If any exist, stop and ask rather than picking a winner.
 
 ### Demo environment
 
@@ -59,7 +59,7 @@ Settled with the project owner across four grilling rounds on 2026-08-29. Each i
 
 16. **Administer the demo app with an Entra account in our own test tenant.** Since that deployment is OIDC-only, the usual Google login will not work there — seed at least one user from the test tenant as Admin in the demo database.
 
-17. **Seed generic mining equipment, plus inspection records.** The prospect's real fleet names would be better, but they are not known. Seed inspections as well as equipment — the public inspection list from plan 0002 is the part a field technician actually uses, and it demos better than the equipment page alone. The existing dev fixtures have a usable date spread to mirror (7 rows spanning to today, 5 rows all older than six months to exercise the promotion rule, 1 single old row).
+17. **Seed generic mining equipment, plus rebuild records.** The prospect's real fleet names would be better, but they are not known. Seed rebuild records as well as equipment — the public rebuild history from plan 0002 (renamed to `Rebuild` on 2026-08-31; see the note at the top of that plan for what changed) is the part a field technician actually uses, and it demos better than the equipment page alone. Note the recency-window/promotion-rule behavior this decision's date spread was written to exercise no longer exists post-rename (every record now renders flat, newest first) — seed a plausible date spread for a rebuild history instead (a few rows spanning years, since rebuilds are rare, not the old weekly/monthly cadence spread).
 
 18. **The demo app stays up indefinitely**, with Fly machines set to auto-stop when idle so it costs effectively nothing. It doubles as the OIDC integration environment.
 
@@ -88,7 +88,7 @@ Verified against the code on 2026-08-29. **Re-verify before implementing** — t
 - **`src/QrSimple.Api/QrSimple.Api.csproj:26`** — references `Microsoft.AspNetCore.Authentication.Google` 10.0.11. **`Microsoft.AspNetCore.Authentication.OpenIdConnect` is not referenced** and must be added at the same version.
 - **`src/QrSimple.Api/appsettings.json:10-15`** — `Authentication:Google:{ClientId,ClientSecret}`, both `"REPLACE_ME"`. Real values come from user-secrets locally and Fly secrets in production.
 - **`tests/QrSimple.Api.Tests/ApiFactory.cs:28-29` and `TestAuthHandler.cs`** — the test host replaces the default scheme with `TestAuthHandler`, which reads an email from a request header and builds a principal. **No test exercises a real external handshake**, and none should need to change as a result of this plan.
-- **Migrations present:** `InitialCreate`, `AddUserIsActiveAndEmailIndex`, `AddDocumentFileUpload`, `AddInspections`. None reference `Organization`.
+- **Migrations present:** `InitialCreate`, `AddUserIsActiveAndEmailIndex`, `AddDocumentFileUpload`, `AddInspections`, `RenameInspectionsToRebuilds` (2026-08-31 — in-place rename, not a drop/recreate; see plan 0002's superseding note). None reference `Organization`.
 
 ## Design
 
@@ -129,7 +129,7 @@ Lowercase in `CreateAsync` before both the duplicate check and the insert, so th
 
 A data-only migration issuing `UPDATE "Users" SET "Email" = lower("Email") WHERE "Email" <> lower("Email");`. **Run the collision check from decision 12 first** — the unique index will reject the update if two rows differ only by case. Existing rows should all be Google-issued and already lowercase, so expect this to affect zero rows in practice; it exists so a database that has drifted cannot silently break sign-in.
 
-Leave `Inspection.UploadedByEmail` alone — those comparisons are already `OrdinalIgnoreCase`.
+Leave `Rebuild.UploadedByEmail` alone — those comparisons are already `OrdinalIgnoreCase`.
 
 ### `MainLayout.razor`
 
@@ -173,9 +173,9 @@ Build and tests run inside the devcontainer (see `AGENTS.md`'s "Running tests" s
 - [ ] A user whose Entra UPN is mixed-case signs in successfully against a lowercase invited row (decision 12).
 - [ ] An authenticated-but-uninvited account still gets 403, not an auto-created user (decision 4).
 - [ ] `MainLayout` shows "Sign in with Microsoft" under OIDC and "Sign in with Google" under Google.
-- [ ] `qr-simple-demo` deployed, with its own database, seeded equipment **and** inspection records, and `PublicBaseUrl` pointing at itself.
+- [ ] `qr-simple-demo` deployed, with its own database, seeded equipment **and** rebuild records, and `PublicBaseUrl` pointing at itself.
 - [ ] **Multi-tenant check (decision 14):** an account from a directory *other than* our test tenant can sign in to the demo app. If tenant consent blocks it, record that in the Log and confirm the fallback account works.
-- [ ] On the demo app: scan a QR code with a phone → public scan page → inspection list → open a PDF. No login prompt anywhere in that path, and no uploader email addresses visible (plan 0002 decision 11).
+- [ ] On the demo app: scan a QR code with a phone → public scan page → rebuild history → open a PDF. No login prompt anywhere in that path, and no uploader email addresses visible (plan 0002 decision 11).
 - [ ] Production is untouched and still authenticating via Google.
 
 ## Log

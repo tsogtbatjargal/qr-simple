@@ -32,11 +32,32 @@ internal static class TestUploads
         return content;
     }
 
-    public static MultipartFormDataContent Inspection(
-        string kind = InspectionKinds.Monthly,
-        DateOnly? inspectionDate = null,
-        string? note = null,
-        string fileName = "inspection.pdf",
+    // `includeFile: false` posts a rebuild with no PDF part at all — the case the optional-PDF
+    // change exists for. Note defaults to something non-empty because the note is required.
+    public static MultipartFormDataContent Rebuild(
+        DateOnly? rebuildDate = null,
+        string note = "Rebuild completed.",
+        string fileName = "rebuild.pdf",
+        byte[]? bytes = null,
+        string contentType = "application/pdf",
+        bool includeFile = true)
+    {
+        var content = new MultipartFormDataContent();
+        if (includeFile)
+        {
+            var fileContent = new ByteArrayContent(bytes ?? FakePdfBytes);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            content.Add(fileContent, "file", fileName);
+        }
+        content.Add(new StringContent((rebuildDate ?? BusinessTime.Today()).ToString("yyyy-MM-dd")), "rebuildDate");
+        content.Add(new StringContent(note), "note");
+        return content;
+    }
+
+    // The OEM QA/QC report has its own single-slot endpoint, so unlike Document() this carries
+    // no label — the label is fixed server-side.
+    public static MultipartFormDataContent OemReport(
+        string fileName = "oem-qa-qc.pdf",
         byte[]? bytes = null,
         string contentType = "application/pdf")
     {
@@ -44,12 +65,6 @@ internal static class TestUploads
         var fileContent = new ByteArrayContent(bytes ?? FakePdfBytes);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         content.Add(fileContent, "file", fileName);
-        content.Add(new StringContent(kind), "kind");
-        content.Add(new StringContent((inspectionDate ?? BusinessTime.Today()).ToString("yyyy-MM-dd")), "inspectionDate");
-        if (note is not null)
-        {
-            content.Add(new StringContent(note), "note");
-        }
         return content;
     }
 }

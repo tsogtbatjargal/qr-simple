@@ -1,13 +1,13 @@
 namespace QrSimple.Api;
 
-// ScanPage.cs (/e/{id}) and InspectionsPage.cs (/e/{id}/inspections) are two renderings of one
+// ScanPage.cs (/e/{id}) and RebuildsPage.cs (/e/{id}/rebuilds) are two renderings of one
 // public design system, not independent pages — this holds what they share (head tags, the
 // site header, and the base CSS for :root/body/.icon/.site-header/main/.panel) so a change to
 // either lands in one place instead of drifting apart. Each page still owns its own
 // page-specific CSS and composes it after BaseStyles in its own <style> block.
 public static class PublicPageChrome
 {
-    // `title` must already be HTML-encoded by the caller (see ScanPage/InspectionsPage's local
+    // `title` must already be HTML-encoded by the caller (see ScanPage/RebuildsPage's local
     // Encode helper) — this class doesn't know the source value well enough to encode it itself.
     public static string HeadTags(string title) => $"""
         <meta charset="utf-8">
@@ -36,6 +36,12 @@ public static class PublicPageChrome
         .site-header .product { font-weight: 700; font-size: .95rem; color: var(--brand-navy); letter-spacing: -0.01em; }
         main { width: min(100%, 760px); min-height: 100vh; margin: 0 auto; padding: clamp(12px, 3vw, 24px); }
         .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: var(--brand-primary); color: white; text-align: center; box-shadow: var(--brand-shadow-md); }
+        /* Phone and tablet-portrait widths have no second column competing for the row, so
+           the logo and product name sit centred instead of hugging the left edge. Desktop
+           keeps them left-aligned, matching the admin header in app.css. */
+        @media (max-width: 600px) {
+            .site-header { justify-content: center; }
+        }
         @media (max-width: 480px) {
             main { padding: 10px; }
             .panel { min-height: 76px; border-radius: 10px; }

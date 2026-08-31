@@ -132,15 +132,15 @@ app.MapGet("/e/{id}", async (Guid id, AppDbContext db) =>
     }
 
     var documents = await db.Documents.Where(d => d.EquipmentId == id).ToListAsync();
-    var inspectionCount = await InspectionCatalog.CountAsync(id, db);
+    var rebuildCount = await RebuildCatalog.CountAsync(id, db);
 
-    return Results.Content(ScanPage.Render(equipment, documents, inspectionCount), "text/html");
+    return Results.Content(ScanPage.Render(equipment, documents, rebuildCount), "text/html");
 });
 
 // No RequireAuthorization/RequireRoleFilter — decision 10 in docs/plans/0002-inspection-records.md,
 // identical exposure to GET /e/{id} and GET /documents/{id}/content: anyone holding the QR
 // code reads this with no account, no login.
-app.MapGet("/e/{id}/inspections", async (Guid id, AppDbContext db) =>
+app.MapGet("/e/{id}/rebuilds", async (Guid id, AppDbContext db) =>
 {
     var equipment = await db.Equipment.FindAsync(id);
     if (equipment is null)
@@ -148,67 +148,103 @@ app.MapGet("/e/{id}/inspections", async (Guid id, AppDbContext db) =>
         return Results.NotFound();
     }
 
-    var inspections = await InspectionCatalog.ListAsync(id, db);
-    return Results.Content(InspectionsPage.Render(equipment, inspections, BusinessTime.Today()), "text/html");
+    var rebuilds = await RebuildCatalog.ListAsync(id, db);
+    return Results.Content(RebuildsPage.Render(equipment, rebuilds), "text/html");
 });
 
-app.MapPost("/equipment/{id}/inspections", async (
-    Guid id, IFormFile file, HttpRequest request, ClaimsPrincipal principal, AppDbContext db) =>
+// `file` is optional: a rebuild record is its date and note, and the PDF may not exist yet when
+// the record is filed. Missing bytes are a valid request here, not a 400.
+app.MapPost("/equipment/{id}/rebuilds", async (
+    Guid id, HttpRequest request, ClaimsPrincipal principal, AppDbContext db) =>
 {
-    var kind = request.Form["kind"].ToString();
     var note = request.Form["note"].ToString();
-    if (!DateOnly.TryParse(request.Form["inspectionDate"], CultureInfo.InvariantCulture, out var inspectionDate))
+    if (!DateOnly.TryParse(request.Form["rebuildDate"], CultureInfo.InvariantCulture, out var rebuildDate))
     {
-        return Results.BadRequest(new { error = "Invalid or missing inspection date." });
+        return Results.BadRequest(new { error = "Invalid or missing rebuild date." });
     }
 
     var uploadedByEmail = principal.FindFirstValue(ClaimTypes.Email)!;
+
+    var file = request.Form.Files.GetFile("file");
+    byte[]? content = null;
+    if (file is not null)
+    {
+        await using var stream = file.OpenReadStream();
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        content = ms.ToArray();
+    }
+
+    var result = await RebuildCatalog.AddAsync(
+        id, rebuildDate, note, content, file?.ContentType, file?.FileName, uploadedByEmail, db);
+    return result.ToHttpResult(rebuild => Results.Created($"/equipment/{id}/rebuilds/{rebuild.Id}", rebuild));
+}).DisableAntiforgery().RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
+
+app.MapPut("/rebuilds/{id}", async (Guid id, UpdateRebuildRequest request, ClaimsPrincipal principal, AppDbContext db) =>
+{
+    var caller = await UserAuthorization.FindAsync(principal.FindFirstValue(ClaimTypes.Email), db);
+    var result = await RebuildCatalog.EditAsync(id, request.RebuildDate, request.Note, caller!.Email, caller.Role, db);
+    return result.ToHttpResult(Results.Ok);
+}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
+
+// Attach-only: this 403s when the record already has a PDF, so it can never quietly swap the
+// evidence under an unchanged note and date. See RebuildCatalog.AttachFileAsync.
+app.MapPost("/rebuilds/{id}/file", async (
+    Guid id, IFormFile file, ClaimsPrincipal principal, AppDbContext db) =>
+{
+    var caller = await UserAuthorization.FindAsync(principal.FindFirstValue(ClaimTypes.Email), db);
 
     await using var stream = file.OpenReadStream();
     using var ms = new MemoryStream();
     await stream.CopyToAsync(ms);
 
-    var result = await InspectionCatalog.AddAsync(
-        id, kind, inspectionDate, note, ms.ToArray(), file.ContentType, file.FileName, uploadedByEmail, db);
-    return result.ToHttpResult(inspection => Results.Created($"/equipment/{id}/inspections/{inspection.Id}", inspection));
+    var result = await RebuildCatalog.AttachFileAsync(
+        id, ms.ToArray(), file.ContentType, file.FileName, caller!.Email, caller.Role, db);
+    return result.ToHttpResult(Results.Ok);
 }).DisableAntiforgery().RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
-app.MapPut("/inspections/{id}", async (Guid id, UpdateInspectionRequest request, ClaimsPrincipal principal, AppDbContext db) =>
-{
-    var caller = await UserAuthorization.FindAsync(principal.FindFirstValue(ClaimTypes.Email), db);
-    var result = await InspectionCatalog.EditAsync(id, request.InspectionDate, request.Note, caller!.Email, caller.Role, db);
-    return result.ToHttpResult(Results.Ok);
-}).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
-
 // Admin-only, unlike DELETE /equipment/{id}/documents/{documentId} (Admin+Operator) — decision
-// 12: an Operator hard-deleting an inspection they filed would defeat the provenance trail the
-// UploadedByEmail/UploadedAtUtc fields exist to preserve.
-app.MapDelete("/equipment/{id}/inspections/{inspectionId}", async (Guid id, Guid inspectionId, AppDbContext db) =>
+// 12: an Operator hard-deleting a rebuild record they filed would defeat the provenance trail
+// the UploadedByEmail/UploadedAtUtc fields exist to preserve.
+app.MapDelete("/equipment/{id}/rebuilds/{rebuildId}", async (Guid id, Guid rebuildId, AppDbContext db) =>
 {
-    var result = await InspectionCatalog.DeleteAsync(inspectionId, db);
+    var result = await RebuildCatalog.DeleteAsync(rebuildId, db);
     return result.ToHttpResult(_ => Results.NoContent());
 }).RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin));
 
 // No RequireAuthorization/RequireRoleFilter — decision 10, matching GET /documents/{id}/content.
-app.MapGet("/inspections/{id}/content", async (Guid id, HttpContext context, AppDbContext db) =>
+// 404s for a rebuild record with no PDF attached, same as for one that doesn't exist.
+app.MapGet("/rebuilds/{id}/content", async (Guid id, HttpContext context, AppDbContext db) =>
 {
-    var result = await InspectionCatalog.GetContentAsync(id, db);
-    if (result is not InspectionResult.Success success)
+    var result = await RebuildCatalog.GetContentAsync(id, db);
+    if (result is not RebuildResult.Success success)
     {
         return Results.NotFound();
     }
 
-    var inspection = success.Inspection;
-    var equipment = await db.Equipment.FindAsync(inspection.EquipmentId);
+    var rebuild = success.Rebuild;
+    var equipment = await db.Equipment.FindAsync(rebuild.EquipmentId);
 
     // Implementation trap (see ContentDisposition.cs): do not pass fileDownloadName to
     // Results.File below — that forces Content-Disposition: attachment and stops phones
     // displaying the PDF inline. Set the header manually instead.
     context.Response.Headers["Content-Disposition"] =
-        ContentDisposition.BuildInlineHeader(equipment?.Name ?? "Equipment", inspection.Kind, inspection.InspectionDate);
+        ContentDisposition.BuildInlineHeader(equipment?.Name ?? "Equipment", rebuild.RebuildDate);
 
-    return Results.File(inspection.Content, inspection.ContentType);
+    return Results.File(rebuild.Content!, rebuild.ContentType!);
 });
+
+// One OEM QA/QC report per equipment — a re-upload replaces the existing row rather than adding
+// a second, mirroring the equipment photo endpoint. See DocumentCatalog.SetOemReportUploadAsync.
+app.MapPost("/equipment/{id}/oem-report", async (Guid id, IFormFile file, AppDbContext db) =>
+{
+    await using var stream = file.OpenReadStream();
+    using var ms = new MemoryStream();
+    await stream.CopyToAsync(ms);
+
+    var result = await DocumentCatalog.SetOemReportUploadAsync(id, ms.ToArray(), file.ContentType, file.FileName, db);
+    return result.ToHttpResult(document => Results.Created($"/documents/{document.Id}/content", document));
+}).DisableAntiforgery().RequireAuthorization().AddEndpointFilter(new RequireRoleFilter(Roles.Admin, Roles.Operator));
 
 app.MapPost("/equipment/{id}/documents", async (Guid id, IFormFile file, HttpRequest request, AppDbContext db) =>
 {
@@ -341,6 +377,6 @@ public record CreateEquipmentRequest(string Name, string Category, string Serial
 record AddCategoryRequest(string Name);
 record AddUserRequest(string Email, string Role);
 record UpdateUserRoleRequest(string Role);
-record UpdateInspectionRequest(DateOnly InspectionDate, string? Note);
+record UpdateRebuildRequest(DateOnly RebuildDate, string? Note);
 
 public partial class Program;

@@ -19,7 +19,8 @@ Anyone — planning session or implementing agent — should feel free to leave 
 | # | Title | Status | Summary |
 |---|-------|--------|---------|
 | [0001](0001-document-file-upload.md) | Photo/document file upload for Equipment | Implemented | Switched Equipment photo/document links from URL-only to real file upload, bytes stored in Postgres, served via `GET /documents/{id}/content`. |
-| [0002](0002-inspection-records.md) | Periodic inspection records for Equipment | Implemented | New `Inspection` entity (dated, noted, attributed PDF) uploaded per Equipment by Admin/Operator, browsable publicly from the scan page at `/e/{id}/inspections` with a 6-month recent window and older records collapsed. |
+| [0002](0002-inspection-records.md) | Periodic inspection records for Equipment | Implemented, partly superseded | New entity (dated, noted, attributed PDF) uploaded per Equipment by Admin/Operator and browsable publicly from the scan page. Later renamed to `Rebuild`: see the note at the top of the plan for what still holds and what changed. |
+| [0003](0003-pluggable-authentication-provider.md) | Pluggable authentication provider (OIDC alongside Google) | Ready for implementation | Adds generic OIDC sign-in (Microsoft Entra first) selected by an explicit config key, exactly one provider per deployment, with per-customer deployments replacing the never-built `Organization` model. |
 
 ## Handoff prompt skeleton
 

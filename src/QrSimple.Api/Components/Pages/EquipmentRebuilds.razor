@@ -1,4 +1,4 @@
-@page "/app/equipment/{Id:guid}/inspections"
+@page "/app/equipment/{Id:guid}/rebuilds"
 @attribute [Authorize]
 @inherits RoleGatedComponentBase
 
@@ -8,52 +8,45 @@
 }
 else
 {
-    <Breadcrumbs Items="@(new() { new("Equipment", "/app"), new(Equipment.Name, $"/app/equipment/{Id}"), new("Inspections") })" />
+    <Breadcrumbs Items="@(new() { new("Equipment", "/app"), new(Equipment.Name, $"/app/equipment/{Id}"), new("Rebuild history") })" />
 
     <h1>@Equipment.Name</h1>
-    <p class="status-line">@Equipment.SerialNumber &middot; Inspection records</p>
+    <p class="status-line">@Equipment.SerialNumber &middot; Rebuild history</p>
 
-    @if (CanManageInspections)
+    @if (CanManageRebuilds)
     {
         @if (Equipment.Status == EquipmentStatus.Retired)
         {
-            <p class="status-line">This equipment is retired; new inspection records cannot be added.</p>
+            <p class="status-line">This equipment is retired; new rebuild records cannot be added.</p>
         }
         else
         {
             <div class="form-card">
                 <div>
-                    <label>
-                        Kind
-                        <InputSelect @bind-Value="NewKind">
-                            @foreach (var kind in InspectionKinds.All)
-                            {
-                                <option value="@kind">@InspectionKinds.DisplayName(kind)</option>
-                            }
-                        </InputSelect>
-                    </label>
+                    <label>Rebuild date <InputDate @bind-Value="NewDate" /></label>
                 </div>
                 <div>
-                    <label>Inspection date <InputDate @bind-Value="NewDate" /></label>
+                    <label>Note <InputTextArea @bind-Value="NewNote" maxlength="1000" /></label>
+                    @if (NoteError is not null)
+                    {
+                        <p class="validation-message">@NoteError</p>
+                    }
                 </div>
                 <div>
-                    <label>Note (optional) <InputTextArea @bind-Value="NewNote" maxlength="1000" /></label>
-                </div>
-                <div>
-                    <label>PDF file <InputFile @key="FileInputKey" OnChange="OnFileSelected" accept=".pdf" /></label>
+                    <label>PDF file (optional) <InputFile @key="FileInputKey" OnChange="OnFileSelected" accept=".pdf" /></label>
                     @if (FileError is not null)
                     {
                         <p class="validation-message">@FileError</p>
                     }
                 </div>
-                <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedBytes is null)" @onclick="UploadAsync"><Icon Name="upload" />@(IsBusy ? "Uploading..." : "Upload inspection")</button>
+                <button type="button" class="btn btn-primary" disabled="@IsBusy" @onclick="AddAsync"><Icon Name="plus" />@(IsBusy ? "Saving..." : "Add rebuild record")</button>
             </div>
         }
     }
 
-    @if (Inspections is null || Inspections.Count == 0)
+    @if (Rebuilds is null || Rebuilds.Count == 0)
     {
-        <p>No inspection records yet.</p>
+        <p>No rebuild records yet.</p>
     }
     else
     {
@@ -62,15 +55,15 @@ else
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Kind</th>
                         <th>Note</th>
+                        <th>PDF</th>
                         <th>Uploaded by</th>
                         <th>Last edited</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var item in Inspections)
+                    @foreach (var item in Rebuilds)
                     {
                         @if (EditingId == item.Id)
                         {
@@ -80,7 +73,7 @@ else
                                         <DataAnnotationsValidator />
                                         <ValidationSummary />
                                         <div>
-                                            <label>Inspection date <InputDate @bind-Value="EditModel.InspectionDate" /></label>
+                                            <label>Rebuild date <InputDate @bind-Value="EditModel.RebuildDate" /></label>
                                         </div>
                                         <div>
                                             <label>Note <InputTextArea @bind-Value="EditModel.Note" maxlength="1000" /></label>
@@ -93,16 +86,46 @@ else
                                 </td>
                             </tr>
                         }
+                        else if (AttachingId == item.Id)
+                        {
+                            <tr>
+                                <td colspan="6">
+                                    <div>
+                                        <label>PDF file <InputFile @key="AttachInputKey" OnChange="OnAttachFileSelected" accept=".pdf" /></label>
+                                        @if (AttachError is not null)
+                                        {
+                                            <p class="validation-message">@AttachError</p>
+                                        }
+                                    </div>
+                                    <div class="button-row">
+                                        <button type="button" class="btn btn-primary" disabled="@(IsBusy || AttachBytes is null)" @onclick="() => SaveAttachAsync(item.Id)"><Icon Name="upload" />@(IsBusy ? "Uploading..." : "Attach PDF")</button>
+                                        <button type="button" class="btn btn-ghost-light" @onclick="CancelAttach"><Icon Name="x" />Cancel</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
                         else
                         {
                             <tr>
-                                <td>@item.InspectionDate.ToString("d MMM yyyy")</td>
-                                <td>@InspectionKinds.DisplayName(item.Kind)</td>
+                                <td>@item.RebuildDate.ToString("d MMM yyyy")</td>
                                 <td>@item.Note</td>
+                                <td>
+                                    @if (item.HasFile)
+                                    {
+                                        <a class="open-link" href="/rebuilds/@item.Id/content" target="_blank" rel="noopener noreferrer">Open<Icon Name="external-link" /></a>
+                                    }
+                                    else if (CanEdit(item))
+                                    {
+                                        <button class="btn btn-ghost-light" @onclick="() => StartAttach(item)"><Icon Name="upload" />Attach PDF</button>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-line">None</span>
+                                    }
+                                </td>
                                 <td>@item.UploadedByEmail</td>
                                 <td>@LastEditedLabel(item)</td>
                                 <td>
-                                    <a class="open-link" href="/inspections/@item.Id/content" target="_blank" rel="noopener noreferrer">Open<Icon Name="external-link" /></a>
                                     @if (CanEdit(item))
                                     {
                                         <button class="btn btn-ghost-light" @onclick="() => StartEdit(item)"><Icon Name="pencil" />Edit</button>
@@ -120,11 +143,11 @@ else
         </div>
     }
 
-    <p><a class="open-link" href="/e/@Equipment.Id/inspections" target="_blank" rel="noopener noreferrer">Public inspections page<Icon Name="external-link" /></a></p>
+    <p><a class="open-link" href="/e/@Equipment.Id/rebuilds" target="_blank" rel="noopener noreferrer">Public rebuild history page<Icon Name="external-link" /></a></p>
 
     <ConfirmDialog @ref="DeleteConfirm"
-                    Title="Delete this inspection record?"
-                    Message="@($"The {(PendingDelete is not null ? InspectionKinds.DisplayName(PendingDelete.Kind) : "")} inspection from {PendingDelete?.InspectionDate} will be permanently removed.")"
+                    Title="Delete this rebuild record?"
+                    Message="@PendingDeleteMessage"
                     ConfirmText="Delete"
                     OnConfirmed="DeleteAsync" />
 }
@@ -140,15 +163,15 @@ else
     protected override string[] AllowedRoles => [Roles.Admin, Roles.Operator, Roles.Reader];
 
     private Equipment? Equipment;
-    private List<InspectionListItem>? Inspections;
+    private List<RebuildListItem>? Rebuilds;
     private string? CallerRole;
     private string? CallerEmail;
     private string? Error;
     private bool IsBusy;
 
-    private string NewKind = InspectionKinds.Monthly;
     private DateOnly NewDate = BusinessTime.Today();
     private string? NewNote;
+    private string? NoteError;
     private Guid FileInputKey = Guid.NewGuid();
     private byte[]? SelectedBytes;
     private string? SelectedContentType;
@@ -156,18 +179,35 @@ else
     private string? FileError;
 
     private Guid? EditingId;
-    private readonly EditInspectionModel EditModel = new();
+    private readonly EditRebuildModel EditModel = new();
+
+    private Guid? AttachingId;
+    private Guid AttachInputKey = Guid.NewGuid();
+    private byte[]? AttachBytes;
+    private string? AttachContentType;
+    private string? AttachFileName;
+    private string? AttachError;
 
     private ConfirmDialog? DeleteConfirm;
-    private InspectionListItem? PendingDelete;
+    private RebuildListItem? PendingDelete;
 
-    private bool CanManageInspections => CallerRole == Roles.Admin || CallerRole == Roles.Operator;
+    // Formatted here rather than inline in the ConfirmDialog Message attribute: a format
+    // specifier inside an interpolated string inside a component attribute (`{X:d MMM yyyy}`)
+    // silently stops the Razor source generator emitting *any* .razor.g.cs for the project. It
+    // reports no error of its own — you get a wall of "namespace Components.Shared does not
+    // exist" instead, which points nowhere near the real line.
+    private string PendingDeleteMessage =>
+        PendingDelete is null
+            ? ""
+            : $"The rebuild record from {PendingDelete.RebuildDate.ToString("d MMM yyyy")} will be permanently removed.";
 
-    private bool CanEdit(InspectionListItem item) =>
+    private bool CanManageRebuilds => CallerRole == Roles.Admin || CallerRole == Roles.Operator;
+
+    private bool CanEdit(RebuildListItem item) =>
         CallerRole == Roles.Admin ||
         (CallerRole == Roles.Operator && string.Equals(item.UploadedByEmail, CallerEmail, StringComparison.OrdinalIgnoreCase));
 
-    private static string LastEditedLabel(InspectionListItem item) =>
+    private static string LastEditedLabel(RebuildListItem item) =>
         item.LastEditedAtUtc is null
             ? ""
             : $"{item.LastEditedByEmail} ({BusinessTime.ToBusiness(item.LastEditedAtUtc.Value):d MMM yyyy})";
@@ -182,21 +222,21 @@ else
         Equipment = await db.Equipment.FindAsync(Id);
         if (Equipment is not null)
         {
-            Inspections = await InspectionCatalog.ListAsync(Id, db);
+            Rebuilds = await RebuildCatalog.ListAsync(Id, db);
         }
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
         var file = e.File;
-        FileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, UploadKind.Inspection);
+        FileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, UploadKind.Rebuild);
         if (FileError is not null)
         {
             SelectedBytes = null;
             return;
         }
 
-        using var stream = file.OpenReadStream(maxAllowedSize: DocumentUpload.MaxInspectionBytes);
+        using var stream = file.OpenReadStream(maxAllowedSize: DocumentUpload.MaxRebuildBytes);
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
         SelectedBytes = ms.ToArray();
@@ -204,9 +244,12 @@ else
         SelectedFileName = file.Name;
     }
 
-    private async Task UploadAsync()
+    private async Task AddAsync()
     {
-        if (SelectedBytes is null)
+        // The PDF is optional but the note is not, so catch the empty note here rather than
+        // round-tripping to the catalog just to render the same message.
+        NoteError = string.IsNullOrWhiteSpace(NewNote) ? "Note is required." : null;
+        if (NoteError is not null)
         {
             return;
         }
@@ -217,36 +260,35 @@ else
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
-            var result = await InspectionCatalog.AddAsync(
-                Id, NewKind, NewDate, NewNote, SelectedBytes, SelectedContentType!, SelectedFileName!, CallerEmail!, db);
+            var result = await RebuildCatalog.AddAsync(
+                Id, NewDate, NewNote, SelectedBytes, SelectedContentType, SelectedFileName, CallerEmail!, db);
 
             switch (result)
             {
-                case InspectionResult.Success success:
-                    Inspections = await InspectionCatalog.ListAsync(Id, db);
-                    NewKind = InspectionKinds.Monthly;
+                case RebuildResult.Success:
+                    Rebuilds = await RebuildCatalog.ListAsync(Id, db);
                     NewDate = BusinessTime.Today();
                     NewNote = null;
                     SelectedBytes = null;
                     SelectedContentType = null;
                     SelectedFileName = null;
                     FileInputKey = Guid.NewGuid();
-                    Toast.Success("Inspection record uploaded.");
+                    Toast.Success("Rebuild record added.");
                     break;
-                case InspectionResult.InvalidFile invalid:
+                case RebuildResult.InvalidFile invalid:
                     Error = invalid.Reason;
                     Toast.Error(Error);
                     break;
-                case InspectionResult.InvalidRequest invalid:
+                case RebuildResult.InvalidRequest invalid:
                     Error = invalid.Reason;
                     Toast.Error(Error);
                     break;
-                case InspectionResult.Forbidden forbidden:
+                case RebuildResult.Forbidden forbidden:
                     Error = forbidden.Reason;
                     Toast.Error(Error);
                     break;
                 default:
-                    Error = "Could not upload inspection record.";
+                    Error = "Could not add rebuild record.";
                     Toast.Error(Error);
                     break;
             }
@@ -257,10 +299,11 @@ else
         }
     }
 
-    private void StartEdit(InspectionListItem item)
+    private void StartEdit(RebuildListItem item)
     {
+        CancelAttach();
         EditingId = item.Id;
-        EditModel.InspectionDate = item.InspectionDate;
+        EditModel.RebuildDate = item.RebuildDate;
         EditModel.Note = item.Note;
     }
 
@@ -269,7 +312,7 @@ else
         EditingId = null;
     }
 
-    private async Task SaveEditAsync(Guid inspectionId)
+    private async Task SaveEditAsync(Guid rebuildId)
     {
         Error = null;
         IsBusy = true;
@@ -277,26 +320,26 @@ else
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
-            var result = await InspectionCatalog.EditAsync(
-                inspectionId, EditModel.InspectionDate, EditModel.Note, CallerEmail!, CallerRole!, db);
+            var result = await RebuildCatalog.EditAsync(
+                rebuildId, EditModel.RebuildDate, EditModel.Note, CallerEmail!, CallerRole!, db);
 
             switch (result)
             {
-                case InspectionResult.Success:
-                    Inspections = await InspectionCatalog.ListAsync(Id, db);
+                case RebuildResult.Success:
+                    Rebuilds = await RebuildCatalog.ListAsync(Id, db);
                     EditingId = null;
-                    Toast.Success("Inspection record updated.");
+                    Toast.Success("Rebuild record updated.");
                     break;
-                case InspectionResult.InvalidRequest invalid:
+                case RebuildResult.InvalidRequest invalid:
                     Error = invalid.Reason;
                     Toast.Error(Error);
                     break;
-                case InspectionResult.Forbidden forbidden:
+                case RebuildResult.Forbidden forbidden:
                     Error = forbidden.Reason;
                     Toast.Error(Error);
                     break;
                 default:
-                    Error = "Could not update inspection record.";
+                    Error = "Could not update rebuild record.";
                     Toast.Error(Error);
                     break;
             }
@@ -307,7 +350,84 @@ else
         }
     }
 
-    private void RequestDelete(InspectionListItem item)
+    private void StartAttach(RebuildListItem item)
+    {
+        CancelEdit();
+        AttachingId = item.Id;
+        AttachBytes = null;
+        AttachError = null;
+        AttachInputKey = Guid.NewGuid();
+    }
+
+    private void CancelAttach()
+    {
+        AttachingId = null;
+        AttachBytes = null;
+        AttachError = null;
+    }
+
+    private async Task OnAttachFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        AttachError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, UploadKind.Rebuild);
+        if (AttachError is not null)
+        {
+            AttachBytes = null;
+            return;
+        }
+
+        using var stream = file.OpenReadStream(maxAllowedSize: DocumentUpload.MaxRebuildBytes);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        AttachBytes = ms.ToArray();
+        AttachContentType = file.ContentType;
+        AttachFileName = file.Name;
+    }
+
+    private async Task SaveAttachAsync(Guid rebuildId)
+    {
+        if (AttachBytes is null)
+        {
+            return;
+        }
+
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await RebuildCatalog.AttachFileAsync(
+                rebuildId, AttachBytes, AttachContentType!, AttachFileName!, CallerEmail!, CallerRole!, db);
+
+            switch (result)
+            {
+                case RebuildResult.Success:
+                    Rebuilds = await RebuildCatalog.ListAsync(Id, db);
+                    CancelAttach();
+                    Toast.Success("PDF attached.");
+                    break;
+                case RebuildResult.InvalidFile invalid:
+                    AttachError = invalid.Reason;
+                    Toast.Error(AttachError);
+                    break;
+                case RebuildResult.Forbidden forbidden:
+                    AttachError = forbidden.Reason;
+                    Toast.Error(AttachError);
+                    break;
+                default:
+                    AttachError = "Could not attach PDF.";
+                    Toast.Error(AttachError);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void RequestDelete(RebuildListItem item)
     {
         PendingDelete = item;
         DeleteConfirm!.Show();
@@ -326,15 +446,15 @@ else
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
-            var result = await InspectionCatalog.DeleteAsync(PendingDelete.Id, db);
+            var result = await RebuildCatalog.DeleteAsync(PendingDelete.Id, db);
             switch (result)
             {
-                case InspectionResult.Success:
-                    Inspections = await InspectionCatalog.ListAsync(Id, db);
-                    Toast.Success("Inspection record deleted.");
+                case RebuildResult.Success:
+                    Rebuilds = await RebuildCatalog.ListAsync(Id, db);
+                    Toast.Success("Rebuild record deleted.");
                     break;
                 default:
-                    Error = "Could not delete inspection record.";
+                    Error = "Could not delete rebuild record.";
                     Toast.Error(Error);
                     break;
             }
@@ -346,9 +466,9 @@ else
         }
     }
 
-    private sealed class EditInspectionModel
+    private sealed class EditRebuildModel
     {
-        public DateOnly InspectionDate { get; set; }
+        public DateOnly RebuildDate { get; set; }
         public string? Note { get; set; }
     }
 }

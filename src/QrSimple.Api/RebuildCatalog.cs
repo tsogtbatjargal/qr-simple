@@ -2,18 +2,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace QrSimple.Api;
 
-public abstract record InspectionResult
+public abstract record RebuildResult
 {
-    public sealed record Success(Inspection Inspection) : InspectionResult;
-    public sealed record NotFound : InspectionResult;
-    public sealed record EquipmentNotFound : InspectionResult;
-    public sealed record InvalidFile(string Reason) : InspectionResult;
-    public sealed record InvalidRequest(string Reason) : InspectionResult;
-    public sealed record Forbidden(string Reason) : InspectionResult;
+    public sealed record Success(Rebuild Rebuild) : RebuildResult;
+    public sealed record NotFound : RebuildResult;
+    public sealed record EquipmentNotFound : RebuildResult;
+    public sealed record InvalidFile(string Reason) : RebuildResult;
+    public sealed record InvalidRequest(string Reason) : RebuildResult;
+    public sealed record Forbidden(string Reason) : RebuildResult;
 
-    public IResult ToHttpResult(Func<Inspection, IResult> onSuccess) => this switch
+    public IResult ToHttpResult(Func<Rebuild, IResult> onSuccess) => this switch
     {
-        Success s => onSuccess(s.Inspection),
+        Success s => onSuccess(s.Rebuild),
         NotFound => Results.NotFound(),
         EquipmentNotFound => Results.NotFound(),
         InvalidFile invalid => Results.BadRequest(new { error = invalid.Reason }),
@@ -24,204 +24,230 @@ public abstract record InspectionResult
 }
 
 // Content deliberately omitted — this is the projection ListAsync must use so a page listing
-// 50 inspections doesn't pull 50 PDFs into memory to render a page that shows none of the
-// bytes. GetContentAsync is the only path that loads Content.
-public sealed record InspectionListItem(
+// many rebuilds doesn't pull every PDF into memory to render a page that shows none of the
+// bytes. GetContentAsync is the only path that loads Content. HasFile stands in for it, so
+// callers can render the "Open PDF" link without touching the blob.
+public sealed record RebuildListItem(
     Guid Id,
     Guid EquipmentId,
-    string Kind,
-    DateOnly InspectionDate,
-    string? Note,
-    string ContentType,
-    string FileName,
+    DateOnly RebuildDate,
+    string Note,
+    bool HasFile,
+    string? ContentType,
+    string? FileName,
     string UploadedByEmail,
     DateTimeOffset UploadedAtUtc,
     DateTimeOffset? LastEditedAtUtc,
     string? LastEditedByEmail);
 
-public static class InspectionCatalog
+public static class RebuildCatalog
 {
     public const int MaxNoteLength = 1000;
 
-    public static async Task<InspectionResult> AddAsync(
+    public static async Task<RebuildResult> AddAsync(
         Guid equipmentId,
-        string kind,
-        DateOnly inspectionDate,
+        DateOnly rebuildDate,
         string? note,
-        byte[] content,
-        string contentType,
-        string fileName,
+        byte[]? content,
+        string? contentType,
+        string? fileName,
         string uploadedByEmail,
         AppDbContext db)
     {
-        var validationError = DocumentUpload.Validate(fileName, contentType, content.LongLength, UploadKind.Inspection);
-        if (validationError is not null)
+        // The PDF is optional, so validate it only when one was actually supplied. Note and
+        // date carry the record on their own.
+        if (content is not null)
         {
-            return new InspectionResult.InvalidFile(validationError);
+            var validationError = DocumentUpload.Validate(fileName ?? "", contentType ?? "", content.LongLength, UploadKind.Rebuild);
+            if (validationError is not null)
+            {
+                return new RebuildResult.InvalidFile(validationError);
+            }
         }
 
-        if (!InspectionKinds.IsKnown(kind))
+        var noteError = ValidateNote(note);
+        if (noteError is not null)
         {
-            return new InspectionResult.InvalidRequest($"Unknown inspection kind: {kind}");
+            return noteError;
         }
 
-        if (inspectionDate > BusinessTime.Today())
+        if (rebuildDate > BusinessTime.Today())
         {
-            return new InspectionResult.InvalidRequest("Inspection date cannot be in the future.");
-        }
-
-        if (note is { Length: > MaxNoteLength })
-        {
-            return new InspectionResult.InvalidRequest($"Note cannot exceed {MaxNoteLength} characters.");
+            return new RebuildResult.InvalidRequest("Rebuild date cannot be in the future.");
         }
 
         var equipment = await db.Equipment.FindAsync(equipmentId);
         if (equipment is null)
         {
-            return new InspectionResult.EquipmentNotFound();
+            return new RebuildResult.EquipmentNotFound();
         }
 
-        // Retired equipment keeps its inspection history readable but can't grow one further —
-        // you don't inspect a decommissioned machine, and allowing it silently corrupts the
+        // Retired equipment keeps its rebuild history readable but can't grow one further —
+        // you don't rebuild a decommissioned machine, and allowing it silently corrupts the
         // record. See docs/plans/0002-inspection-records.md decision 15; also enforced in the
         // admin UI, but that alone wouldn't stop a direct call here.
         if (equipment.Status == EquipmentStatus.Retired)
         {
-            return new InspectionResult.Forbidden("This equipment is retired; new inspection records cannot be added.");
+            return new RebuildResult.Forbidden("This equipment is retired; new rebuild records cannot be added.");
         }
 
-        var inspection = new Inspection
+        var rebuild = new Rebuild
         {
             Id = Guid.NewGuid(),
             EquipmentId = equipmentId,
-            Kind = kind,
-            InspectionDate = inspectionDate,
-            Note = string.IsNullOrWhiteSpace(note) ? null : note,
+            RebuildDate = rebuildDate,
+            Note = note!.Trim(),
             Content = content,
-            ContentType = contentType,
-            FileName = fileName,
+            ContentType = content is null ? null : contentType,
+            FileName = content is null ? null : fileName,
             UploadedByEmail = uploadedByEmail,
             UploadedAtUtc = DateTimeOffset.UtcNow,
         };
 
-        db.Inspections.Add(inspection);
+        db.Rebuilds.Add(rebuild);
         await db.SaveChangesAsync();
-        return new InspectionResult.Success(inspection);
+        return new RebuildResult.Success(rebuild);
     }
 
-    // Operators may correct Note/InspectionDate on records they uploaded; the PDF itself is
+    // Operators may correct Note/RebuildDate on records they uploaded; an attached PDF is
     // immutable (replacing it changes what the record attests to — that's delete-and-re-upload,
     // which is Admin-gated). Admins may edit any record. See decision 13.
-    public static async Task<InspectionResult> EditAsync(
-        Guid inspectionId, DateOnly inspectionDate, string? note, string callerEmail, string callerRole, AppDbContext db)
+    public static async Task<RebuildResult> EditAsync(
+        Guid rebuildId, DateOnly rebuildDate, string? note, string callerEmail, string callerRole, AppDbContext db)
     {
-        var inspection = await db.Inspections.FindAsync(inspectionId);
-        if (inspection is null)
+        var rebuild = await db.Rebuilds.FindAsync(rebuildId);
+        if (rebuild is null)
         {
-            return new InspectionResult.NotFound();
+            return new RebuildResult.NotFound();
         }
 
-        if (callerRole != Roles.Admin && !string.Equals(inspection.UploadedByEmail, callerEmail, StringComparison.OrdinalIgnoreCase))
+        var forbidden = CheckEditPermission(rebuild, callerEmail, callerRole);
+        if (forbidden is not null)
         {
-            return new InspectionResult.Forbidden("Only the uploader or an Admin can edit this record.");
+            return forbidden;
         }
 
-        if (inspectionDate > BusinessTime.Today())
+        if (rebuildDate > BusinessTime.Today())
         {
-            return new InspectionResult.InvalidRequest("Inspection date cannot be in the future.");
+            return new RebuildResult.InvalidRequest("Rebuild date cannot be in the future.");
         }
 
-        if (note is { Length: > MaxNoteLength })
+        var noteError = ValidateNote(note);
+        if (noteError is not null)
         {
-            return new InspectionResult.InvalidRequest($"Note cannot exceed {MaxNoteLength} characters.");
+            return noteError;
         }
 
-        inspection.InspectionDate = inspectionDate;
-        inspection.Note = string.IsNullOrWhiteSpace(note) ? null : note;
-        inspection.LastEditedAtUtc = DateTimeOffset.UtcNow;
-        inspection.LastEditedByEmail = callerEmail;
+        rebuild.RebuildDate = rebuildDate;
+        rebuild.Note = note!.Trim();
+        rebuild.LastEditedAtUtc = DateTimeOffset.UtcNow;
+        rebuild.LastEditedByEmail = callerEmail;
 
         await db.SaveChangesAsync();
-        return new InspectionResult.Success(inspection);
+        return new RebuildResult.Success(rebuild);
     }
 
-    public static Task<List<InspectionListItem>> ListAsync(Guid equipmentId, AppDbContext db) =>
-        db.Inspections
-            .Where(i => i.EquipmentId == equipmentId)
-            .OrderByDescending(i => i.InspectionDate)
-            .ThenByDescending(i => i.UploadedAtUtc)
-            .Select(i => new InspectionListItem(
-                i.Id,
-                i.EquipmentId,
-                i.Kind,
-                i.InspectionDate,
-                i.Note,
-                i.ContentType,
-                i.FileName,
-                i.UploadedByEmail,
-                i.UploadedAtUtc,
-                i.LastEditedAtUtc,
-                i.LastEditedByEmail))
+    // Attach-only, never replace. A record filed without a PDF (the point of making it
+    // optional) can gain one later; a record that already has one keeps it, because swapping
+    // the evidence under an unchanged note/date is exactly the ambiguity decision 13 exists to
+    // prevent. To swap it, an Admin deletes the record and files it again.
+    public static async Task<RebuildResult> AttachFileAsync(
+        Guid rebuildId, byte[] content, string contentType, string fileName, string callerEmail, string callerRole, AppDbContext db)
+    {
+        var rebuild = await db.Rebuilds.FindAsync(rebuildId);
+        if (rebuild is null)
+        {
+            return new RebuildResult.NotFound();
+        }
+
+        var forbidden = CheckEditPermission(rebuild, callerEmail, callerRole);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
+        if (rebuild.Content is not null)
+        {
+            return new RebuildResult.Forbidden(
+                "This rebuild record already has a PDF. Delete the record and file it again to replace the file.");
+        }
+
+        var validationError = DocumentUpload.Validate(fileName, contentType, content.LongLength, UploadKind.Rebuild);
+        if (validationError is not null)
+        {
+            return new RebuildResult.InvalidFile(validationError);
+        }
+
+        rebuild.Content = content;
+        rebuild.ContentType = contentType;
+        rebuild.FileName = fileName;
+        rebuild.LastEditedAtUtc = DateTimeOffset.UtcNow;
+        rebuild.LastEditedByEmail = callerEmail;
+
+        await db.SaveChangesAsync();
+        return new RebuildResult.Success(rebuild);
+    }
+
+    private static RebuildResult? CheckEditPermission(Rebuild rebuild, string callerEmail, string callerRole) =>
+        callerRole != Roles.Admin && !string.Equals(rebuild.UploadedByEmail, callerEmail, StringComparison.OrdinalIgnoreCase)
+            ? new RebuildResult.Forbidden("Only the uploader or an Admin can edit this record.")
+            : null;
+
+    private static RebuildResult? ValidateNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return new RebuildResult.InvalidRequest("Note is required.");
+        }
+
+        return note.Trim().Length > MaxNoteLength
+            ? new RebuildResult.InvalidRequest($"Note cannot exceed {MaxNoteLength} characters.")
+            : null;
+    }
+
+    public static Task<List<RebuildListItem>> ListAsync(Guid equipmentId, AppDbContext db) =>
+        db.Rebuilds
+            .Where(r => r.EquipmentId == equipmentId)
+            .OrderByDescending(r => r.RebuildDate)
+            .ThenByDescending(r => r.UploadedAtUtc)
+            .Select(r => new RebuildListItem(
+                r.Id,
+                r.EquipmentId,
+                r.RebuildDate,
+                r.Note,
+                r.Content != null,
+                r.ContentType,
+                r.FileName,
+                r.UploadedByEmail,
+                r.UploadedAtUtc,
+                r.LastEditedAtUtc,
+                r.LastEditedByEmail))
             .ToListAsync();
 
     public static Task<int> CountAsync(Guid equipmentId, AppDbContext db) =>
-        db.Inspections.CountAsync(i => i.EquipmentId == equipmentId);
+        db.Rebuilds.CountAsync(r => r.EquipmentId == equipmentId);
 
-    public static async Task<InspectionResult> GetContentAsync(Guid id, AppDbContext db)
+    public static async Task<RebuildResult> GetContentAsync(Guid id, AppDbContext db)
     {
-        var inspection = await db.Inspections.FindAsync(id);
-        if (inspection is null)
+        var rebuild = await db.Rebuilds.FindAsync(id);
+        if (rebuild is null || rebuild.Content is null)
         {
-            return new InspectionResult.NotFound();
+            return new RebuildResult.NotFound();
         }
 
-        return new InspectionResult.Success(inspection);
+        return new RebuildResult.Success(rebuild);
     }
 
-    public static async Task<InspectionResult> DeleteAsync(Guid id, AppDbContext db)
+    public static async Task<RebuildResult> DeleteAsync(Guid id, AppDbContext db)
     {
-        var inspection = await db.Inspections.FindAsync(id);
-        if (inspection is null)
+        var rebuild = await db.Rebuilds.FindAsync(id);
+        if (rebuild is null)
         {
-            return new InspectionResult.NotFound();
+            return new RebuildResult.NotFound();
         }
 
-        db.Inspections.Remove(inspection);
+        db.Rebuilds.Remove(rebuild);
         await db.SaveChangesAsync();
-        return new InspectionResult.Success(inspection);
-    }
-
-    // Pure, no DB — decisions 16-17 are unit-testable without a container. `ordered` must
-    // already be sorted newest-first (ListAsync's order); an item exactly `months` back counts
-    // as recent (inclusive). The recent set is never smaller than `minimumRecent`: for
-    // Annual/Quarterly regimes the last `months` can legitimately contain zero records while
-    // several reports sit hidden under "Older," which would otherwise read as an empty page.
-    public static (IReadOnlyList<T> Recent, IReadOnlyList<T> Older) SplitByRecency<T>(
-        IReadOnlyList<T> ordered, DateOnly today, Func<T, DateOnly> dateOf, int months = 6, int minimumRecent = 3)
-    {
-        var cutoff = today.AddMonths(-months);
-        var recent = new List<T>();
-        var older = new List<T>();
-
-        foreach (var item in ordered)
-        {
-            if (dateOf(item) >= cutoff)
-            {
-                recent.Add(item);
-            }
-            else
-            {
-                older.Add(item);
-            }
-        }
-
-        if (recent.Count < minimumRecent && older.Count > 0)
-        {
-            var needed = Math.Min(minimumRecent - recent.Count, older.Count);
-            recent.AddRange(older.Take(needed));
-            older = older.Skip(needed).ToList();
-        }
-
-        return (recent, older);
+        return new RebuildResult.Success(rebuild);
     }
 }

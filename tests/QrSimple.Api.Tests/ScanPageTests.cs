@@ -184,30 +184,91 @@ public class ScanPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // Equipment with inspection records but no Documents must not show the "no documents"
-    // empty state — the inspections panel alone is enough content for the .documents nav.
+    // Equipment with rebuild records but no Documents must not show the "no documents"
+    // empty state — the rebuild history panel alone is enough content for the .documents nav.
     [Fact]
-    public async Task Scan_page_does_not_show_no_documents_message_when_only_inspections_exist()
+    public async Task Scan_page_does_not_show_no_documents_message_when_only_rebuilds_exist()
     {
         var client = factory.CreateClientAs("Operator");
 
         var createResponse = await client.PostAsJsonAsync("/equipment", new
         {
-            name = "Inspection Only Pump",
+            name = "Rebuild Only Pump",
             category = "Pump",
-            serialNumber = "IOP-0001",
+            serialNumber = "ROP-0001",
             site = "North Pit",
         });
         var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
 
-        using var inspectionContent = TestUploads.Inspection();
-        var uploadResponse = await client.PostAsync($"/equipment/{created!.Id}/inspections", inspectionContent);
+        using var rebuildContent = TestUploads.Rebuild();
+        var uploadResponse = await client.PostAsync($"/equipment/{created!.Id}/rebuilds", rebuildContent);
         Assert.True(uploadResponse.IsSuccessStatusCode);
 
         var html = await client.GetStringAsync($"/e/{created.Id}");
 
         Assert.DoesNotContain("No documents are available", html);
-        Assert.Contains("Inspection records (1)", html);
+        Assert.Contains("Rebuild history (1)", html);
+    }
+
+    [Fact]
+    public async Task Scan_page_shows_the_oem_report_panel_and_links_straight_to_the_pdf()
+    {
+        var client = factory.CreateClientAs("Operator");
+
+        var createResponse = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Oem Panel Pump",
+            category = "Pump",
+            serialNumber = "OPP-0001",
+            site = "North Pit",
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        using var report = TestUploads.OemReport();
+        var uploadResponse = await client.PostAsync($"/equipment/{created!.Id}/oem-report", report);
+        Assert.True(uploadResponse.IsSuccessStatusCode);
+        var document = await uploadResponse.Content.ReadFromJsonAsync<CreatedDocument>();
+
+        var html = await client.GetStringAsync($"/e/{created.Id}");
+
+        Assert.Contains("OEM QA/QC report", html);
+        Assert.Contains($"/documents/{document!.Id}/content", html);
+    }
+
+    // The report has its own panel, so it must not also appear in the generic document list —
+    // otherwise a scanner sees the same PDF offered twice under two different names.
+    [Fact]
+    public async Task Oem_report_is_not_repeated_in_the_generic_document_list()
+    {
+        var client = factory.CreateClientAs("Operator");
+
+        var createResponse = await client.PostAsJsonAsync("/equipment", new
+        {
+            name = "Oem Dedup Pump",
+            category = "Pump",
+            serialNumber = "ODP-0001",
+            site = "North Pit",
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreatedEquipment>();
+
+        using var report = TestUploads.OemReport();
+        await client.PostAsync($"/equipment/{created!.Id}/oem-report", report);
+
+        var html = await client.GetStringAsync($"/e/{created.Id}");
+
+        Assert.Equal(1, CountOccurrences(html, "OEM QA/QC report"));
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        for (var i = haystack.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+             i >= 0;
+             i = haystack.IndexOf(needle, i + needle.Length, StringComparison.OrdinalIgnoreCase))
+        {
+            count++;
+        }
+        return count;
     }
 
     private sealed record CreatedEquipment(Guid Id);

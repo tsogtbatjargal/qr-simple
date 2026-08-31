@@ -199,8 +199,50 @@ else
         </div>
     }
 
-    <h2><Icon Name="clipboard-check" />Inspections</h2>
-    <p><a class="open-link" href="/app/equipment/@Item.Id/inspections">Manage inspection records<Icon Name="chevron-right" /></a></p>
+    <h2><Icon Name="shield-check" />OEM QA/QC report</h2>
+    <div class="card">
+        @if (OemReport is not null)
+        {
+            <p><a class="open-link" href="@DocumentHref(OemReport)" target="_blank" rel="noopener noreferrer">@OemReport.FileName<Icon Name="external-link" /></a></p>
+        }
+        else
+        {
+            <p class="status-line">No OEM QA/QC report uploaded.</p>
+        }
+
+        @if (CanManageDocuments)
+        {
+            @if (OemReport is null || ShowOemReportForm)
+            {
+                <div class="form-card">
+                    <div>
+                        <label>PDF file <InputFile @key="OemReportInputKey" OnChange="OnOemReportFileSelected" accept=".pdf" /></label>
+                        @if (OemReportFileError is not null)
+                        {
+                            <p class="validation-message">@OemReportFileError</p>
+                        }
+                    </div>
+                    <div class="button-row">
+                        <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedOemReportBytes is null)" @onclick="SaveOemReportAsync"><Icon Name="check-circle" />@(IsBusy ? "Saving..." : "Save report")</button>
+                        @if (OemReport is not null)
+                        {
+                            <button type="button" class="btn btn-ghost-light" @onclick="CancelOemReportForm"><Icon Name="x" />Cancel</button>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="button-row">
+                    <button class="btn btn-ghost-light" @onclick="() => ShowOemReportForm = true"><Icon Name="upload" />Replace</button>
+                    <button class="btn btn-danger" disabled="@IsBusy" @onclick="() => RequestDeleteDocument(OemReport)"><Icon Name="trash-2" />Remove</button>
+                </div>
+            }
+        }
+    </div>
+
+    <h2><Icon Name="wrench" />Rebuild history</h2>
+    <p><a class="open-link" href="/app/equipment/@Item.Id/rebuilds">Manage rebuild records<Icon Name="chevron-right" /></a></p>
 
     <img class="qr-code" src="/equipment/@Item.Id/qr" alt="QR code for @Item.Name" width="240" height="240" />
     <p><a class="open-link" href="/e/@Item.Id" target="_blank" rel="noopener noreferrer">Public scan page<Icon Name="external-link" /></a></p>
@@ -212,7 +254,10 @@ else
                     OnConfirmed="RetireAsync" />
 
     <ConfirmDialog @ref="DeleteDocConfirm"
-                    Title="@(PendingDelete is not null && Photo?.Id == PendingDelete.Id ? "Remove this photo?" : "Delete this document?")"
+                    Title="@(PendingDelete is null ? "Delete this document?"
+                             : Photo?.Id == PendingDelete.Id ? "Remove this photo?"
+                             : OemReport?.Id == PendingDelete.Id ? "Remove this OEM QA/QC report?"
+                             : "Delete this document?")"
                     Message="@($"\"{PendingDelete?.Label}\" will be permanently removed.")"
                     ConfirmText="Delete"
                     OnConfirmed="DeleteDocumentAsync" />
@@ -238,8 +283,14 @@ else
 
     private List<Document>? Documents;
     private Document? Photo;
-    private List<Document> OtherDocuments => (Documents ?? []).Where(d => d.Id != Photo?.Id).ToList();
+    private Document? OemReport;
+
+    // The photo and the OEM QA/QC report each own a dedicated section above, so neither may
+    // also appear in the generic Documents table.
+    private List<Document> OtherDocuments =>
+        (Documents ?? []).Where(d => d.Id != Photo?.Id && d.Id != OemReport?.Id).ToList();
     private bool ShowPhotoForm;
+    private bool ShowOemReportForm;
     private ConfirmDialog? DeleteDocConfirm;
     private Document? PendingDelete;
 
@@ -248,6 +299,12 @@ else
     private string? SelectedPhotoContentType;
     private string? SelectedPhotoFileName;
     private string? PhotoFileError;
+
+    private Guid OemReportInputKey = Guid.NewGuid();
+    private byte[]? SelectedOemReportBytes;
+    private string? SelectedOemReportContentType;
+    private string? SelectedOemReportFileName;
+    private string? OemReportFileError;
 
     private Guid DocumentInputKey = Guid.NewGuid();
     private byte[]? SelectedDocumentBytes;
@@ -282,6 +339,7 @@ else
 
             Documents = await DocumentCatalog.ListAsync(Id, db);
             Photo = Documents.FirstOrDefault(d => DocumentCatalog.IsPhotoLabel(d.Label));
+            OemReport = Documents.FirstOrDefault(d => DocumentCatalog.IsOemReportLabel(d.Label));
         }
     }
 
@@ -354,13 +412,82 @@ else
         }
     }
 
+    private async Task OnOemReportFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        OemReportFileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, UploadKind.OemReport);
+        if (OemReportFileError is not null)
+        {
+            SelectedOemReportBytes = null;
+            return;
+        }
+
+        using var stream = file.OpenReadStream(maxAllowedSize: DocumentUpload.MaxDocumentBytes);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        SelectedOemReportBytes = ms.ToArray();
+        SelectedOemReportContentType = file.ContentType;
+        SelectedOemReportFileName = file.Name;
+    }
+
+    private void CancelOemReportForm()
+    {
+        ShowOemReportForm = false;
+        SelectedOemReportBytes = null;
+        OemReportFileError = null;
+        OemReportInputKey = Guid.NewGuid();
+    }
+
+    private async Task SaveOemReportAsync()
+    {
+        if (SelectedOemReportBytes is null)
+        {
+            return;
+        }
+
+        Error = null;
+        IsBusy = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var result = await DocumentCatalog.SetOemReportUploadAsync(
+                Id, SelectedOemReportBytes, SelectedOemReportContentType!, SelectedOemReportFileName!, db);
+            switch (result)
+            {
+                case DocumentResult.Success success:
+                    OemReport = success.Document;
+                    Documents = [.. (Documents ?? []).Where(d => d.Id != success.Document.Id), success.Document];
+                    ShowOemReportForm = false;
+                    SelectedOemReportBytes = null;
+                    SelectedOemReportContentType = null;
+                    SelectedOemReportFileName = null;
+                    OemReportInputKey = Guid.NewGuid();
+                    Toast.Success("OEM QA/QC report saved.");
+                    break;
+                case DocumentResult.InvalidFile invalid:
+                    Error = invalid.Reason;
+                    Toast.Error(Error);
+                    break;
+                default:
+                    Error = "Could not save OEM QA/QC report.";
+                    Toast.Error(Error);
+                    break;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     private async Task OnDocumentFileSelected(InputFileChangeEventArgs e)
     {
         var file = e.File;
         DocumentFileError = DocumentUpload.Validate(file.Name, file.ContentType, file.Size, UploadKind.Document);
-        if (DocumentFileError is null && DocumentCatalog.IsPhotoLabel(Path.GetFileNameWithoutExtension(file.Name)))
+        if (DocumentFileError is null && DocumentCatalog.IsReservedLabel(Path.GetFileNameWithoutExtension(file.Name)))
         {
-            DocumentFileError = "That file name is reserved for the equipment photo. Rename the file, or use the Photo section above.";
+            DocumentFileError = "That file name is reserved for the equipment photo or the OEM QA/QC report. Rename the file, or use the matching section above.";
         }
 
         if (DocumentFileError is not null)
@@ -452,6 +579,13 @@ else
                         Photo = null;
                         SelectedPhotoBytes = null;
                         PhotoInputKey = Guid.NewGuid();
+                    }
+                    if (OemReport?.Id == success.Document.Id)
+                    {
+                        OemReport = null;
+                        ShowOemReportForm = false;
+                        SelectedOemReportBytes = null;
+                        OemReportInputKey = Guid.NewGuid();
                     }
                     Toast.Success("Document deleted.");
                     break;

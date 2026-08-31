@@ -442,8 +442,10 @@ h2 .icon { font-size: 1.15rem; color: var(--blue); }
 }
 
 @media (max-width: 600px) {
-    header.site-header { flex-direction: column; align-items: flex-start; }
-    header.site-header nav.nav-links { width: 100%; justify-content: space-between; }
+    /* Stacked at this width, so centre the brand and the nav row rather than leaving them
+       pinned left. Mirrors the public header rule in PublicPageChrome.cs. */
+    header.site-header { flex-direction: column; align-items: center; text-align: center; }
+    header.site-header nav.nav-links { width: 100%; justify-content: center; }
     header.site-header a.brand .brand-logo { height: 30px; }
     header.site-header a.brand .brand-name { font-size: 1.05rem; }
     main.content { padding: 14px; }

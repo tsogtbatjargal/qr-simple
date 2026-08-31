@@ -1,6 +1,23 @@
 # Plan 0002: Periodic inspection records for Equipment
 
-Status: Implemented
+Status: Implemented, partly superseded on 2026-08-31
+
+> **Renamed to rebuild history.** This shipped as a periodic-inspection record and was renamed
+> when the product's actual use turned out to be rebuild history. Nothing below is edited — it
+> is the record of what was decided on 2026-08-29 and why. What changed since:
+>
+> - `Inspection` → `Rebuild`; `InspectionDate` → `RebuildDate`; table `Inspections` → `Rebuilds`;
+>   routes `/e/{id}/inspections` → `/e/{id}/rebuilds`, `/inspections/{id}/content` →
+>   `/rebuilds/{id}/content`, `/app/equipment/{id}/inspections` → `.../rebuilds`.
+> - **Decision 3 (Kind) is gone.** Weekly/Monthly/Quarterly/Annual/Ad-hoc are inspection
+>   cadences with no rebuild equivalent; `InspectionKinds.cs` was deleted.
+> - **Decision 2 is inverted.** The PDF is now optional and the note is required — the date and
+>   note are the record, the PDF is supporting evidence. It can be attached later to a record
+>   filed without one, but still never swapped (decision 13 holds, see `AttachFileAsync`).
+> - **Decisions 16-17 (the 6-month recent window and `SplitByRecency`) are gone.** Rebuilds are
+>   years apart, so that window hid almost the whole history; every record now renders flat,
+>   newest first.
+> - Decisions 1, 4-15, and 18-19 still hold as written, reading "rebuild" for "inspection".
 
 ## Why
 

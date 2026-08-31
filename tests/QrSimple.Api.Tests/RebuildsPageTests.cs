@@ -4,25 +4,25 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace QrSimple.Api.Tests;
 
-public class InspectionsPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
+public class RebuildsPageTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     [Fact]
-    public async Task Anyone_can_view_the_inspections_page_without_logging_in()
+    public async Task Anyone_can_view_the_rebuild_history_page_without_logging_in()
     {
         var operatorClient = factory.CreateClientAs("Operator");
-        var equipment = await CreateEquipmentAsync(operatorClient, "Anon Inspections Pump");
+        var equipment = await CreateEquipmentAsync(operatorClient, "Anon Rebuilds Pump");
 
-        using var content = TestUploads.Inspection(note: "Routine check, all good.");
-        await operatorClient.PostAsync($"/equipment/{equipment.Id}/inspections", content);
+        using var content = TestUploads.Rebuild(note: "Engine and transmission rebuilt.");
+        await operatorClient.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
 
         var anonymousClient = factory.CreateClient();
-        var response = await anonymousClient.GetAsync($"/e/{equipment.Id}/inspections");
+        var response = await anonymousClient.GetAsync($"/e/{equipment.Id}/rebuilds");
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
-        Assert.Contains("Anon Inspections Pump", html);
-        Assert.Contains("Routine check, all good.", html);
+        Assert.Contains("Anon Rebuilds Pump", html);
+        Assert.Contains("Engine and transmission rebuilt.", html);
     }
 
     [Fact]
@@ -31,11 +31,13 @@ public class InspectionsPageTests(ApiFactory factory) : IClassFixture<ApiFactory
         var client = factory.CreateClientAs("Operator");
         var equipment = await CreateEquipmentAsync(client, "Serial Visible Pump");
 
-        var html = await client.GetStringAsync($"/e/{equipment.Id}/inspections");
+        var html = await client.GetStringAsync($"/e/{equipment.Id}/rebuilds");
 
         Assert.Contains(equipment.SerialNumber, html);
     }
 
+    // docs/plans/0002-inspection-records.md decision 11 — UploadedByEmail is stored always and
+    // rendered only in the admin UI, never on the anonymously readable page.
     [Fact]
     public async Task Uploader_email_does_not_appear_anywhere_in_the_public_html()
     {
@@ -53,70 +55,88 @@ public class InspectionsPageTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         var equipment = await CreateEquipmentAsync(client, "Email Hidden Pump");
 
-        using var content = TestUploads.Inspection();
-        await client.PostAsync($"/equipment/{equipment.Id}/inspections", content);
+        using var content = TestUploads.Rebuild();
+        await client.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
 
         var anonymousClient = factory.CreateClient();
-        var html = await anonymousClient.GetStringAsync($"/e/{equipment.Id}/inspections");
+        var html = await anonymousClient.GetStringAsync($"/e/{equipment.Id}/rebuilds");
 
         Assert.DoesNotContain(email, html);
         Assert.DoesNotContain("@example.com", html);
     }
 
+    // Rebuilds are years apart, so the page renders every record flat rather than collapsing
+    // anything older than six months into a <details> drawer the way the inspections page did.
     [Fact]
-    public async Task A_recent_inspection_is_outside_details_and_an_old_one_is_inside()
+    public async Task Every_record_renders_outside_a_details_drawer_however_old_it_is()
     {
         var client = factory.CreateClientAs("Operator");
-        var equipment = await CreateEquipmentAsync(client, "Recency Split Pump");
+        var equipment = await CreateEquipmentAsync(client, "Flat History Pump");
 
-        // One genuinely recent record plus four old ones: the minimum-recent-of-3 rule (decision
-        // 17) will promote two of the old ones into the visible set, so this needs enough old
-        // records that promotion still leaves some behind <details> — a single old record would
-        // get fully promoted and <details> would never render (see the failure this replaced).
-        using var recent = TestUploads.Inspection(kind: InspectionKinds.Monthly, inspectionDate: BusinessTime.Today());
-        await client.PostAsync($"/equipment/{equipment.Id}/inspections", recent);
-
-        foreach (var monthsAgo in new[] { 8, 9, 10, 11 })
+        foreach (var monthsAgo in new[] { 0, 12, 36, 60, 96 })
         {
-            using var old = TestUploads.Inspection(kind: InspectionKinds.Annual, inspectionDate: BusinessTime.Today().AddMonths(-monthsAgo));
-            await client.PostAsync($"/equipment/{equipment.Id}/inspections", old);
-        }
-
-        var html = await client.GetStringAsync($"/e/{equipment.Id}/inspections");
-
-        Assert.Contains("<details", html);
-        Assert.Contains("Older inspections (2)", html);
-
-        var detailsIndex = html.IndexOf("<details", StringComparison.Ordinal);
-        var recentSectionIndex = html.IndexOf(BusinessTime.Today().ToString("d MMM yyyy"), StringComparison.Ordinal);
-        var oldestSectionIndex = html.IndexOf(BusinessTime.Today().AddMonths(-11).ToString("d MMM yyyy"), StringComparison.Ordinal);
-
-        Assert.True(recentSectionIndex < detailsIndex, "the recent inspection should render before <details>");
-        Assert.True(oldestSectionIndex > detailsIndex, "the oldest inspection should render inside <details>");
-    }
-
-    [Fact]
-    public async Task Equipment_with_only_old_inspections_still_surfaces_the_minimum_recent()
-    {
-        var client = factory.CreateClientAs("Operator");
-        var equipment = await CreateEquipmentAsync(client, "All Old Annual Pump");
-
-        foreach (var monthsAgo in new[] { 12, 24, 36, 48, 60 })
-        {
-            using var content = TestUploads.Inspection(kind: InspectionKinds.Annual, inspectionDate: BusinessTime.Today().AddMonths(-monthsAgo));
-            var response = await client.PostAsync($"/equipment/{equipment.Id}/inspections", content);
+            using var content = TestUploads.Rebuild(rebuildDate: BusinessTime.Today().AddMonths(-monthsAgo));
+            var response = await client.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
             Assert.True(response.IsSuccessStatusCode);
         }
 
-        var html = await client.GetStringAsync($"/e/{equipment.Id}/inspections");
+        var html = await client.GetStringAsync($"/e/{equipment.Id}/rebuilds");
 
-        // decision 17: even though none of the 5 records are within 6 months, 3 still show as
-        // recent (outside the collapsed <details>), leaving 2 older.
-        Assert.Contains("Older inspections (2)", html);
+        Assert.DoesNotContain("<details", html);
+        foreach (var monthsAgo in new[] { 0, 12, 36, 60, 96 })
+        {
+            Assert.Contains(BusinessTime.Today().AddMonths(-monthsAgo).ToString("d MMM yyyy"), html);
+        }
+    }
 
-        var detailsIndex = html.IndexOf("<details", StringComparison.Ordinal);
-        var mostRecentIndex = html.IndexOf(BusinessTime.Today().AddMonths(-12).ToString("d MMM yyyy"), StringComparison.Ordinal);
-        Assert.True(mostRecentIndex < detailsIndex);
+    [Fact]
+    public async Task Records_render_newest_first()
+    {
+        var client = factory.CreateClientAs("Operator");
+        var equipment = await CreateEquipmentAsync(client, "Newest First Pump");
+
+        using var older = TestUploads.Rebuild(rebuildDate: BusinessTime.Today().AddMonths(-48));
+        await client.PostAsync($"/equipment/{equipment.Id}/rebuilds", older);
+        using var newer = TestUploads.Rebuild(rebuildDate: BusinessTime.Today());
+        await client.PostAsync($"/equipment/{equipment.Id}/rebuilds", newer);
+
+        var html = await client.GetStringAsync($"/e/{equipment.Id}/rebuilds");
+
+        var newestIndex = html.IndexOf(BusinessTime.Today().ToString("d MMM yyyy"), StringComparison.Ordinal);
+        var oldestIndex = html.IndexOf(BusinessTime.Today().AddMonths(-48).ToString("d MMM yyyy"), StringComparison.Ordinal);
+        Assert.True(newestIndex < oldestIndex, "the newest rebuild should render first");
+    }
+
+    [Fact]
+    public async Task A_record_with_no_pdf_renders_without_an_open_pdf_link()
+    {
+        var client = factory.CreateClientAs("Operator");
+        var equipment = await CreateEquipmentAsync(client, "No Link Pump");
+
+        using var content = TestUploads.Rebuild(note: "Rebuilt in the field, no report.", includeFile: false);
+        await client.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
+
+        var html = await client.GetStringAsync($"/e/{equipment.Id}/rebuilds");
+
+        Assert.Contains("Rebuilt in the field, no report.", html);
+        Assert.DoesNotContain("Open PDF", html);
+        Assert.DoesNotContain("/content", html);
+    }
+
+    [Fact]
+    public async Task A_record_with_a_pdf_renders_a_link_to_it()
+    {
+        var client = factory.CreateClientAs("Operator");
+        var equipment = await CreateEquipmentAsync(client, "With Link Pump");
+
+        using var content = TestUploads.Rebuild();
+        var created = await client.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
+        var rebuild = await created.Content.ReadFromJsonAsync<CreatedRebuild>();
+
+        var html = await client.GetStringAsync($"/e/{equipment.Id}/rebuilds");
+
+        Assert.Contains("Open PDF", html);
+        Assert.Contains($"/rebuilds/{rebuild!.Id}/content", html);
     }
 
     [Fact]
@@ -125,73 +145,73 @@ public class InspectionsPageTests(ApiFactory factory) : IClassFixture<ApiFactory
         var client = factory.CreateClientAs("Operator");
         var equipment = await CreateEquipmentAsync(client, "Note Encoding Pump");
 
-        using var content = TestUploads.Inspection(note: "<script>alert(1)</script>");
-        await client.PostAsync($"/equipment/{equipment.Id}/inspections", content);
+        using var content = TestUploads.Rebuild(note: "<script>alert(1)</script>");
+        await client.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
 
-        var html = await client.GetStringAsync($"/e/{equipment.Id}/inspections");
+        var html = await client.GetStringAsync($"/e/{equipment.Id}/rebuilds");
 
         Assert.DoesNotContain("<script>alert(1)</script>", html);
         Assert.Contains("&lt;script&gt;", html);
     }
 
     [Fact]
-    public async Task Empty_state_renders_when_there_are_no_inspections()
+    public async Task Empty_state_renders_when_there_are_no_rebuilds()
     {
         var client = factory.CreateClientAs("Operator");
-        var equipment = await CreateEquipmentAsync(client, "No Inspections Pump");
+        var equipment = await CreateEquipmentAsync(client, "No Rebuilds Pump");
 
-        var html = await client.GetStringAsync($"/e/{equipment.Id}/inspections");
+        var html = await client.GetStringAsync($"/e/{equipment.Id}/rebuilds");
 
-        Assert.Contains("No inspection records yet.", html);
+        Assert.Contains("No rebuild records yet.", html);
     }
 
     [Fact]
-    public async Task Retired_equipment_inspections_page_still_renders()
+    public async Task Retired_equipment_rebuild_history_page_still_renders()
     {
         var operatorClient = factory.CreateClientAs("Operator");
-        var equipment = await CreateEquipmentAsync(operatorClient, "Retired Inspections Pump");
+        var equipment = await CreateEquipmentAsync(operatorClient, "Retired Rebuilds Pump");
 
-        using var content = TestUploads.Inspection(note: "Last inspection before retirement.");
-        await operatorClient.PostAsync($"/equipment/{equipment.Id}/inspections", content);
+        using var content = TestUploads.Rebuild(note: "Last rebuild before retirement.");
+        await operatorClient.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
 
         var adminClient = factory.CreateClientAs("Admin");
         await adminClient.PostAsync($"/equipment/{equipment.Id}/retire", content: null);
 
-        var response = await factory.CreateClient().GetAsync($"/e/{equipment.Id}/inspections");
+        var response = await factory.CreateClient().GetAsync($"/e/{equipment.Id}/rebuilds");
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Last inspection before retirement.", html);
+        Assert.Contains("Last rebuild before retirement.", html);
     }
 
     [Fact]
-    public async Task Scan_page_inspection_panel_shows_the_true_count_and_links_to_the_page()
+    public async Task Scan_page_rebuild_panel_shows_the_true_count_and_links_to_the_page()
     {
         var client = factory.CreateClientAs("Operator");
         var equipment = await CreateEquipmentAsync(client, "Panel Count Pump");
 
         for (var i = 0; i < 2; i++)
         {
-            using var content = TestUploads.Inspection(inspectionDate: BusinessTime.Today().AddDays(-i));
-            await client.PostAsync($"/equipment/{equipment.Id}/inspections", content);
+            using var content = TestUploads.Rebuild(rebuildDate: BusinessTime.Today().AddDays(-i));
+            await client.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
         }
 
         var html = await client.GetStringAsync($"/e/{equipment.Id}");
 
-        Assert.Contains($"/e/{equipment.Id}/inspections", html);
-        Assert.Contains("Inspection records (2)", html);
+        Assert.Contains($"/e/{equipment.Id}/rebuilds", html);
+        Assert.Contains("Rebuild history (2)", html);
     }
 
     [Fact]
-    public async Task Scan_page_omits_the_inspection_panel_when_there_are_no_inspections()
+    public async Task Scan_page_omits_the_rebuild_panel_when_there_are_no_rebuilds()
     {
         var client = factory.CreateClientAs("Operator");
         var equipment = await CreateEquipmentAsync(client, "No Panel Pump");
 
         var html = await client.GetStringAsync($"/e/{equipment.Id}");
 
-        Assert.DoesNotContain($"/e/{equipment.Id}/inspections", html);
-        Assert.DoesNotContain("Inspection records", html);
+        Assert.DoesNotContain($"/e/{equipment.Id}/rebuilds", html);
+        Assert.DoesNotContain("Rebuild history", html);
     }
 
     private static async Task<CreatedEquipment> CreateEquipmentAsync(HttpClient client, string name)
@@ -200,11 +220,12 @@ public class InspectionsPageTests(ApiFactory factory) : IClassFixture<ApiFactory
         {
             name,
             category = "Pump",
-            serialNumber = $"IPG-{Guid.NewGuid():N}"[..10],
+            serialNumber = $"RPG-{Guid.NewGuid():N}"[..10],
             site = "North Pit",
         });
         return (await created.Content.ReadFromJsonAsync<CreatedEquipment>())!;
     }
 
     private sealed record CreatedEquipment(Guid Id, string SerialNumber);
+    private sealed record CreatedRebuild(Guid Id);
 }

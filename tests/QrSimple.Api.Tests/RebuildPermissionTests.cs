@@ -5,20 +5,21 @@ using Microsoft.Extensions.DependencyInjection;
 namespace QrSimple.Api.Tests;
 
 // Covers docs/plans/0002-inspection-records.md decisions 12-14 — the ones most likely to
-// regress silently: Operator hard-delete, cross-Operator edit, and Reader write access.
-public class InspectionPermissionTests(ApiFactory factory) : IClassFixture<ApiFactory>
+// regress silently: Operator hard-delete, cross-Operator edit, and Reader write access. These
+// rules carried over unchanged when inspections became rebuild history.
+public class RebuildPermissionTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     [Fact]
-    public async Task Operator_cannot_delete_an_inspection_but_admin_can()
+    public async Task Operator_cannot_delete_a_rebuild_record_but_admin_can()
     {
         var operatorClient = factory.CreateClientAs("Operator");
-        var (equipmentId, inspectionId) = await SeedInspectionAsync(operatorClient);
+        var (equipmentId, rebuildId) = await SeedRebuildAsync(operatorClient);
 
-        var deniedResponse = await operatorClient.DeleteAsync($"/equipment/{equipmentId}/inspections/{inspectionId}");
+        var deniedResponse = await operatorClient.DeleteAsync($"/equipment/{equipmentId}/rebuilds/{rebuildId}");
         Assert.Equal(HttpStatusCode.Forbidden, deniedResponse.StatusCode);
 
         var adminClient = factory.CreateClientAs("Admin");
-        var deleteResponse = await adminClient.DeleteAsync($"/equipment/{equipmentId}/inspections/{inspectionId}");
+        var deleteResponse = await adminClient.DeleteAsync($"/equipment/{equipmentId}/rebuilds/{rebuildId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
     }
 
@@ -26,11 +27,11 @@ public class InspectionPermissionTests(ApiFactory factory) : IClassFixture<ApiFa
     public async Task Operator_can_edit_a_record_they_uploaded()
     {
         var operatorClient = factory.CreateClientAs("Operator");
-        var (_, inspectionId) = await SeedInspectionAsync(operatorClient);
+        var (_, rebuildId) = await SeedRebuildAsync(operatorClient);
 
-        var response = await operatorClient.PutAsJsonAsync($"/inspections/{inspectionId}", new
+        var response = await operatorClient.PutAsJsonAsync($"/rebuilds/{rebuildId}", new
         {
-            inspectionDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
+            rebuildDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
             note = "Corrected note.",
         });
 
@@ -41,12 +42,12 @@ public class InspectionPermissionTests(ApiFactory factory) : IClassFixture<ApiFa
     public async Task Operator_cannot_edit_another_operators_record()
     {
         var uploaderClient = factory.CreateClientAs("Operator");
-        var (_, inspectionId) = await SeedInspectionAsync(uploaderClient);
+        var (_, rebuildId) = await SeedRebuildAsync(uploaderClient);
 
         var otherOperatorClient = factory.CreateClientAs("Operator");
-        var response = await otherOperatorClient.PutAsJsonAsync($"/inspections/{inspectionId}", new
+        var response = await otherOperatorClient.PutAsJsonAsync($"/rebuilds/{rebuildId}", new
         {
-            inspectionDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
+            rebuildDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
             note = "Should not be allowed.",
         });
 
@@ -57,12 +58,12 @@ public class InspectionPermissionTests(ApiFactory factory) : IClassFixture<ApiFa
     public async Task Admin_can_edit_any_record()
     {
         var operatorClient = factory.CreateClientAs("Operator");
-        var (_, inspectionId) = await SeedInspectionAsync(operatorClient);
+        var (_, rebuildId) = await SeedRebuildAsync(operatorClient);
 
         var adminClient = factory.CreateClientAs("Admin");
-        var response = await adminClient.PutAsJsonAsync($"/inspections/{inspectionId}", new
+        var response = await adminClient.PutAsJsonAsync($"/rebuilds/{rebuildId}", new
         {
-            inspectionDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
+            rebuildDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
             note = "Admin correction.",
         });
 
@@ -70,30 +71,34 @@ public class InspectionPermissionTests(ApiFactory factory) : IClassFixture<ApiFa
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var inspection = await db.Inspections.FindAsync(inspectionId);
-        Assert.NotNull(inspection!.LastEditedAtUtc);
+        var rebuild = await db.Rebuilds.FindAsync(rebuildId);
+        Assert.NotNull(rebuild!.LastEditedAtUtc);
     }
 
     [Fact]
-    public async Task Reader_cannot_upload_edit_or_delete_an_inspection()
+    public async Task Reader_cannot_upload_edit_or_delete_a_rebuild_record()
     {
         var operatorClient = factory.CreateClientAs("Operator");
-        var (equipmentId, inspectionId) = await SeedInspectionAsync(operatorClient);
+        var (equipmentId, rebuildId) = await SeedRebuildAsync(operatorClient);
 
         var readerClient = factory.CreateClientAs("Reader");
 
-        using var uploadContent = TestUploads.Inspection();
-        var uploadResponse = await readerClient.PostAsync($"/equipment/{equipmentId}/inspections", uploadContent);
+        using var uploadContent = TestUploads.Rebuild();
+        var uploadResponse = await readerClient.PostAsync($"/equipment/{equipmentId}/rebuilds", uploadContent);
         Assert.Equal(HttpStatusCode.Forbidden, uploadResponse.StatusCode);
 
-        var editResponse = await readerClient.PutAsJsonAsync($"/inspections/{inspectionId}", new
+        var editResponse = await readerClient.PutAsJsonAsync($"/rebuilds/{rebuildId}", new
         {
-            inspectionDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
+            rebuildDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
             note = "Reader should not edit.",
         });
         Assert.Equal(HttpStatusCode.Forbidden, editResponse.StatusCode);
 
-        var deleteResponse = await readerClient.DeleteAsync($"/equipment/{equipmentId}/inspections/{inspectionId}");
+        using var attachContent = TestUploads.OemReport();
+        var attachResponse = await readerClient.PostAsync($"/rebuilds/{rebuildId}/file", attachContent);
+        Assert.Equal(HttpStatusCode.Forbidden, attachResponse.StatusCode);
+
+        var deleteResponse = await readerClient.DeleteAsync($"/equipment/{equipmentId}/rebuilds/{rebuildId}");
         Assert.Equal(HttpStatusCode.Forbidden, deleteResponse.StatusCode);
     }
 
@@ -101,26 +106,30 @@ public class InspectionPermissionTests(ApiFactory factory) : IClassFixture<ApiFa
     public async Task Anonymous_requests_are_rejected_on_every_write_route()
     {
         var operatorClient = factory.CreateClientAs("Operator");
-        var (equipmentId, inspectionId) = await SeedInspectionAsync(operatorClient);
+        var (equipmentId, rebuildId) = await SeedRebuildAsync(operatorClient);
 
         var anonymousClient = factory.CreateClient();
 
-        using var uploadContent = TestUploads.Inspection();
-        var uploadResponse = await anonymousClient.PostAsync($"/equipment/{equipmentId}/inspections", uploadContent);
+        using var uploadContent = TestUploads.Rebuild();
+        var uploadResponse = await anonymousClient.PostAsync($"/equipment/{equipmentId}/rebuilds", uploadContent);
         Assert.Equal(HttpStatusCode.Unauthorized, uploadResponse.StatusCode);
 
-        var editResponse = await anonymousClient.PutAsJsonAsync($"/inspections/{inspectionId}", new
+        var editResponse = await anonymousClient.PutAsJsonAsync($"/rebuilds/{rebuildId}", new
         {
-            inspectionDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
+            rebuildDate = BusinessTime.Today().ToString("yyyy-MM-dd"),
             note = "Anonymous should not edit.",
         });
         Assert.Equal(HttpStatusCode.Unauthorized, editResponse.StatusCode);
 
-        var deleteResponse = await anonymousClient.DeleteAsync($"/equipment/{equipmentId}/inspections/{inspectionId}");
+        using var attachContent = TestUploads.OemReport();
+        var attachResponse = await anonymousClient.PostAsync($"/rebuilds/{rebuildId}/file", attachContent);
+        Assert.Equal(HttpStatusCode.Unauthorized, attachResponse.StatusCode);
+
+        var deleteResponse = await anonymousClient.DeleteAsync($"/equipment/{equipmentId}/rebuilds/{rebuildId}");
         Assert.Equal(HttpStatusCode.Unauthorized, deleteResponse.StatusCode);
     }
 
-    private static async Task<(Guid EquipmentId, Guid InspectionId)> SeedInspectionAsync(HttpClient uploaderClient)
+    private static async Task<(Guid EquipmentId, Guid RebuildId)> SeedRebuildAsync(HttpClient uploaderClient)
     {
         var created = await uploaderClient.PostAsJsonAsync("/equipment", new
         {
@@ -131,13 +140,13 @@ public class InspectionPermissionTests(ApiFactory factory) : IClassFixture<ApiFa
         });
         var equipment = (await created.Content.ReadFromJsonAsync<CreatedEquipment>())!;
 
-        using var content = TestUploads.Inspection();
-        var uploadResponse = await uploaderClient.PostAsync($"/equipment/{equipment.Id}/inspections", content);
-        var inspection = (await uploadResponse.Content.ReadFromJsonAsync<CreatedInspection>())!;
+        using var content = TestUploads.Rebuild();
+        var uploadResponse = await uploaderClient.PostAsync($"/equipment/{equipment.Id}/rebuilds", content);
+        var rebuild = (await uploadResponse.Content.ReadFromJsonAsync<CreatedRebuild>())!;
 
-        return (equipment.Id, inspection.Id);
+        return (equipment.Id, rebuild.Id);
     }
 
     private sealed record CreatedEquipment(Guid Id);
-    private sealed record CreatedInspection(Guid Id);
+    private sealed record CreatedRebuild(Guid Id);
 }

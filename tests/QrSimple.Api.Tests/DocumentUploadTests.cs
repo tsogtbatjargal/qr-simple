@@ -157,6 +157,101 @@ public class DocumentUploadTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal("second.png", photoRows[0].FileName);
     }
 
+    [Fact]
+    public async Task Oem_report_upload_stores_one_row_under_the_reserved_label()
+    {
+        var client = factory.CreateClientAs("Operator");
+        var equipment = await CreateOemEquipmentAsync(client, "OEM Upload Truck", "OU-0001");
+
+        using var report = TestUploads.OemReport(fileName: "qa-qc.pdf");
+        var response = await client.PostAsync($"/equipment/{equipment.Id}/oem-report", report);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var documents = await DocumentCatalog.ListAsync(equipment.Id, db);
+
+        var row = Assert.Single(documents);
+        Assert.Equal(DocumentCatalog.OemReportLabel, row.Label);
+        Assert.Equal("qa-qc.pdf", row.FileName);
+    }
+
+    // One report per equipment: a second upload overwrites the first rather than adding a
+    // second row, so the scan page never has to pick a winner by undefined row order.
+    [Fact]
+    public async Task A_second_oem_report_upload_replaces_the_first()
+    {
+        var client = factory.CreateClientAs("Operator");
+        var equipment = await CreateOemEquipmentAsync(client, "OEM Replace Truck", "OR-0001");
+
+        using var first = TestUploads.OemReport(fileName: "first.pdf");
+        await client.PostAsync($"/equipment/{equipment.Id}/oem-report", first);
+        using var second = TestUploads.OemReport(fileName: "second.pdf");
+        await client.PostAsync($"/equipment/{equipment.Id}/oem-report", second);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var documents = await DocumentCatalog.ListAsync(equipment.Id, db);
+
+        var row = Assert.Single(documents);
+        Assert.Equal("second.pdf", row.FileName);
+    }
+
+    [Fact]
+    public async Task A_non_pdf_oem_report_is_rejected()
+    {
+        var client = factory.CreateClientAs("Operator");
+        var equipment = await CreateOemEquipmentAsync(client, "OEM Docx Truck", "OD-0001");
+
+        using var report = TestUploads.OemReport(
+            fileName: "report.docx",
+            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        var response = await client.PostAsync($"/equipment/{equipment.Id}/oem-report", report);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_reader_cannot_upload_an_oem_report_and_anonymous_is_unauthorized()
+    {
+        var operatorClient = factory.CreateClientAs("Operator");
+        var equipment = await CreateOemEquipmentAsync(operatorClient, "OEM Role Truck", "ORL-0001");
+
+        using var readerReport = TestUploads.OemReport();
+        var readerResponse = await factory.CreateClientAs("Reader")
+            .PostAsync($"/equipment/{equipment.Id}/oem-report", readerReport);
+        Assert.Equal(HttpStatusCode.Forbidden, readerResponse.StatusCode);
+
+        using var anonymousReport = TestUploads.OemReport();
+        var anonymousResponse = await factory.CreateClient()
+            .PostAsync($"/equipment/{equipment.Id}/oem-report", anonymousReport);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Uploading_an_oem_report_for_unknown_equipment_returns_not_found()
+    {
+        var client = factory.CreateClientAs("Operator");
+
+        using var report = TestUploads.OemReport();
+        var response = await client.PostAsync($"/equipment/{Guid.NewGuid()}/oem-report", report);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private static async Task<CreatedEquipment> CreateOemEquipmentAsync(HttpClient client, string name, string serialNumber)
+    {
+        var created = await client.PostAsJsonAsync("/equipment", new
+        {
+            name,
+            category = "Truck",
+            serialNumber,
+            site = "North Pit",
+        });
+        return (await created.Content.ReadFromJsonAsync<CreatedEquipment>())!;
+    }
+
     private sealed record CreatedEquipment(Guid Id);
     private sealed record CreatedDocument(Guid Id);
 }

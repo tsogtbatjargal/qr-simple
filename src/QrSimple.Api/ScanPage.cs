@@ -18,10 +18,13 @@ public static class ScanPage
     private const string AlertIcon =
         """<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>""";
 
-    private const string ClipboardCheckIcon =
-        """<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>""";
+    private const string WrenchIcon =
+        """<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>""";
 
-    public static string Render(Equipment equipment, IReadOnlyList<Document> documents, int inspectionCount)
+    private const string ShieldCheckIcon =
+        """<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>""";
+
+    public static string Render(Equipment equipment, IReadOnlyList<Document> documents, int rebuildCount)
     {
         string Encode(string value) => WebUtility.HtmlEncode(value);
 
@@ -48,8 +51,10 @@ public static class ScanPage
                 """,
         };
 
+        var oemReport = documents.FirstOrDefault(document => DocumentCatalog.IsOemReportLabel(document.Label));
+
         var documentLinks = string.Concat(documents
-            .Where(document => document != photo)
+            .Where(document => document != photo && document != oemReport)
             .OrderBy(document => document.Label.Equals("User manual", StringComparison.OrdinalIgnoreCase) ? 0
                 : document.Label.Equals("Maintenance instruction", StringComparison.OrdinalIgnoreCase) ? 1
                 : 2)
@@ -65,25 +70,34 @@ public static class ScanPage
             }));
 
         // Count is the true total (no cap — see docs/plans/0002-inspection-records.md decision
-        // 18). Rendered only when non-zero: a technician tapping into an empty inspections page
-        // is worse than not offering the link at all.
-        var inspectionsPanel = inspectionCount > 0
+        // 18). Rendered only when non-zero: a technician tapping into an empty rebuild history
+        // page is worse than not offering the link at all.
+        var rebuildsPanel = rebuildCount > 0
             ? $"""
-                <a class="panel document" href="/e/{equipment.Id}/inspections">
-                    {ClipboardCheckIcon}<span>Inspection records ({inspectionCount})</span>{ExternalLinkIcon}
+                <a class="panel document" href="/e/{equipment.Id}/rebuilds">
+                    {WrenchIcon}<span>Rebuild history ({rebuildCount})</span>{ExternalLinkIcon}
                 </a>
                 """
             : "";
 
-        var documentsSection = documentLinks.Length > 0 || inspectionsPanel.Length > 0
-            ? $"""<nav class="documents" aria-label="Equipment documents">{documentLinks}{inspectionsPanel}</nav>"""
+        // One per equipment, so this is a direct link to the PDF rather than a list page.
+        var oemReportPanel = oemReport is not null
+            ? $"""
+                <a class="panel document" href="{Encode(oemReport.Content is not null ? $"/documents/{oemReport.Id}/content" : oemReport.Url ?? "")}" target="_blank" rel="noopener noreferrer">
+                    {ShieldCheckIcon}<span>OEM QA/QC report</span>{ExternalLinkIcon}
+                </a>
+                """
+            : "";
+
+        var documentsSection = documentLinks.Length > 0 || rebuildsPanel.Length > 0 || oemReportPanel.Length > 0
+            ? $"""<nav class="documents" aria-label="Equipment documents">{documentLinks}{oemReportPanel}{rebuildsPanel}</nav>"""
             : """<p class="empty-documents">No documents are available for this equipment.</p>""";
 
         // Colours, radii, shadows and the typeface all come from brand/tokens.css, linked
         // in the head below. This page and the admin UI (wwwroot/app.css) are one shared
         // design system — never introduce a literal colour on one surface alone. Head tags,
         // the site header, and the base :root/body/.icon/.site-header/main/.panel rules live
-        // in PublicPageChrome, shared with InspectionsPage.cs.
+        // in PublicPageChrome, shared with RebuildsPage.cs.
         var styles = PublicPageChrome.BaseStyles + """
             .stack { display: grid; gap: 14px; }
             .photo { min-height: 220px; display: grid; place-items: center; padding: 18px; background: var(--brand-primary); border-radius: 18px; box-shadow: var(--brand-shadow-md); }

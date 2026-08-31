@@ -9,9 +9,9 @@ namespace QrSimple.Api;
 // fallback with an RFC 5987 filename* for clients that support it (every modern browser).
 public static class ContentDisposition
 {
-    public static string BuildInlineHeader(string equipmentName, string kind, DateOnly inspectionDate)
+    public static string BuildInlineHeader(string equipmentName, DateOnly rebuildDate)
     {
-        var rawName = $"{equipmentName}-{kind}-{inspectionDate:yyyy-MM-dd}.pdf";
+        var rawName = $"{equipmentName}-Rebuild-{rebuildDate:yyyy-MM-dd}.pdf";
         var sanitized = SanitizeForPath(rawName);
 
         var asciiFallback = ToAsciiFallback(sanitized);
@@ -42,6 +42,6 @@ public static class ContentDisposition
         }
 
         var ascii = builder.ToString().Trim(' ', '-');
-        return string.IsNullOrWhiteSpace(ascii) ? "inspection.pdf" : ascii;
+        return string.IsNullOrWhiteSpace(ascii) ? "rebuild.pdf" : ascii;
     }
 }

@@ -186,69 +186,69 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Operator_sees_the_inspection_upload_form_on_the_inspections_page()
+    public async Task Operator_sees_the_rebuild_form_on_the_rebuild_history_page()
     {
         var client = factory.CreateClientAs("Operator");
         var created = await client.PostAsJsonAsync("/equipment", new
         {
-            name = "Inspections UI Truck",
+            name = "Rebuilds UI Truck",
             category = "Truck",
-            serialNumber = "IUI-0001",
+            serialNumber = "RUI-0001",
             site = "North Pit",
         });
         var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
 
-        var response = await client.GetAsync($"/app/equipment/{equipment!.Id}/inspections");
+        var response = await client.GetAsync($"/app/equipment/{equipment!.Id}/rebuilds");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Upload inspection", body);
+        Assert.Contains("Add rebuild record", body);
         Assert.Contains("type=\"file\"", body);
     }
 
     [Fact]
-    public async Task Reader_sees_the_inspections_page_read_only()
+    public async Task Reader_sees_the_rebuild_history_page_read_only()
     {
         var adminClient = factory.CreateClientAs("Admin");
         var created = await adminClient.PostAsJsonAsync("/equipment", new
         {
-            name = "Reader Inspections Truck",
+            name = "Reader Rebuilds Truck",
             category = "Truck",
-            serialNumber = "RIT-0001",
+            serialNumber = "RRT-0001",
             site = "North Pit",
         });
         var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
 
-        using var content = TestUploads.Inspection(note: "Reader-visible inspection.");
-        await adminClient.PostAsync($"/equipment/{equipment!.Id}/inspections", content);
+        using var content = TestUploads.Rebuild(note: "Reader-visible rebuild.");
+        await adminClient.PostAsync($"/equipment/{equipment!.Id}/rebuilds", content);
 
         var readerClient = factory.CreateClientAs("Reader");
-        var response = await readerClient.GetAsync($"/app/equipment/{equipment.Id}/inspections");
+        var response = await readerClient.GetAsync($"/app/equipment/{equipment.Id}/rebuilds");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Reader-visible inspection.", body);
-        Assert.DoesNotContain("Upload inspection", body);
+        Assert.Contains("Reader-visible rebuild.", body);
+        Assert.DoesNotContain("Add rebuild record", body);
         Assert.DoesNotContain("type=\"file\"", body);
     }
 
     [Fact]
-    public async Task Unregistered_email_is_redirected_from_the_inspections_page()
+    public async Task Unregistered_email_is_redirected_from_the_rebuild_history_page()
     {
         var adminClient = factory.CreateClientAs("Admin");
         var created = await adminClient.PostAsJsonAsync("/equipment", new
         {
-            name = "Stranger Inspections Truck",
+            name = "Stranger Rebuilds Truck",
             category = "Truck",
-            serialNumber = "SIT-0001",
+            serialNumber = "SRT-0001",
             site = "North Pit",
         });
         var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
 
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TestEmailHeader, "stranger-inspections@example.com");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TestEmailHeader, "stranger-rebuilds@example.com");
 
-        var response = await client.GetAsync($"/app/equipment/{equipment!.Id}/inspections");
+        var response = await client.GetAsync($"/app/equipment/{equipment!.Id}/rebuilds");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("http://localhost/app/not-authorized", response.Headers.Location?.OriginalString);

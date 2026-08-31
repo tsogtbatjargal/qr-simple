@@ -1,95 +1,62 @@
 namespace QrSimple.Api.Tests;
 
-// SplitByRecency is a pure function (no DB), so these run with no Testcontainers fixture —
-// cheapest and most valuable tests for docs/plans/0002-inspection-records.md decisions 16-17.
-public class InspectionCatalogTests
+// ContentDisposition is pure (no DB), so these run with no Testcontainers fixture — cheapest
+// and most valuable tests for the inline-PDF filename rules in docs/plans/0002-inspection-records.md
+// decision 19. This file replaced the SplitByRecency tests, which went when the rebuild history
+// page dropped the recent/older split (a 6-month window is meaningless for an event that
+// happens years apart).
+public class RebuildCatalogTests
 {
-    private static readonly DateOnly Today = new(2026, 8, 29);
-
     [Fact]
-    public void Empty_input_returns_two_empty_lists()
+    public void Inline_header_names_the_file_after_the_equipment_and_date()
     {
-        var (recent, older) = InspectionCatalog.SplitByRecency(
-            Array.Empty<DateOnly>(), Today, d => d);
+        var header = ContentDisposition.BuildInlineHeader("Haul Truck 12", new DateOnly(2026, 8, 12));
 
-        Assert.Empty(recent);
-        Assert.Empty(older);
+        Assert.StartsWith("inline; ", header);
+        Assert.Contains("""filename="Haul Truck 12-Rebuild-2026-08-12.pdf" """.TrimEnd(), header);
     }
 
     [Fact]
-    public void All_records_within_six_months_are_all_recent()
+    public void Path_separators_in_an_equipment_name_are_replaced()
     {
-        DateOnly[] dates = [Today, Today.AddMonths(-1), Today.AddMonths(-3)];
+        var header = ContentDisposition.BuildInlineHeader("Pump A/B\\C", new DateOnly(2026, 1, 2));
 
-        var (recent, older) = InspectionCatalog.SplitByRecency(dates, Today, d => d);
-
-        Assert.Equal(3, recent.Count);
-        Assert.Empty(older);
+        Assert.DoesNotContain("A/B", header);
+        Assert.Contains("Pump A-B-C-Rebuild-2026-01-02.pdf", header);
     }
 
     [Fact]
-    public void All_records_older_than_six_months_still_surface_the_minimum_recent()
+    public void A_cyrillic_name_keeps_an_ascii_fallback_and_carries_the_real_name_in_filename_star()
     {
-        DateOnly[] dates = [Today.AddMonths(-7), Today.AddMonths(-8), Today.AddMonths(-9), Today.AddMonths(-10), Today.AddMonths(-11)];
+        var header = ContentDisposition.BuildInlineHeader("Экскаватор 7", new DateOnly(2026, 3, 4));
 
-        var (recent, older) = InspectionCatalog.SplitByRecency(dates, Today, d => d);
+        // The quoted filename must stay ASCII; filename* carries the percent-encoded original.
+        var quoted = header[(header.IndexOf("filename=\"", StringComparison.Ordinal) + 10)..];
+        quoted = quoted[..quoted.IndexOf('"')];
+        Assert.All(quoted, c => Assert.True(c < 128, $"non-ASCII '{c}' leaked into the quoted filename"));
 
-        Assert.Equal(3, recent.Count);
-        Assert.Equal(2, older.Count);
-        // The three most recent (closest to today) win the promotion, in order.
-        Assert.Equal(Today.AddMonths(-7), recent[0]);
-        Assert.Equal(Today.AddMonths(-8), recent[1]);
-        Assert.Equal(Today.AddMonths(-9), recent[2]);
-        Assert.Equal(Today.AddMonths(-10), older[0]);
-        Assert.Equal(Today.AddMonths(-11), older[1]);
+        Assert.Contains("filename*=UTF-8''", header);
+        Assert.Contains(Uri.EscapeDataString("Экскаватор"), header);
     }
 
     [Fact]
-    public void Mixed_recent_and_older_records_split_correctly()
+    public void An_entirely_non_ascii_name_still_produces_a_usable_ascii_fallback()
     {
-        DateOnly[] dates = [Today, Today.AddMonths(-2), Today.AddMonths(-6), Today.AddMonths(-7), Today.AddMonths(-12)];
+        var header = ContentDisposition.BuildInlineHeader("Экскаватор", new DateOnly(2026, 5, 6));
 
-        var (recent, older) = InspectionCatalog.SplitByRecency(dates, Today, d => d);
-
-        // today.AddMonths(-6) is the inclusive boundary — counts as recent.
-        Assert.Equal(3, recent.Count);
-        Assert.Contains(Today, recent);
-        Assert.Contains(Today.AddMonths(-2), recent);
-        Assert.Contains(Today.AddMonths(-6), recent);
-        Assert.Equal(2, older.Count);
+        // "Экскаватор-Rebuild-2026-05-06.pdf" still has ASCII left after stripping Cyrillic, so
+        // the fallback is that remainder rather than the "rebuild.pdf" last resort.
+        Assert.Contains("Rebuild-2026-05-06.pdf", header);
     }
 
     [Fact]
-    public void Exactly_six_months_ago_counts_as_recent()
+    public void A_double_quote_in_the_name_cannot_break_out_of_the_quoted_filename()
     {
-        DateOnly[] dates = [Today.AddMonths(-6)];
+        var header = ContentDisposition.BuildInlineHeader("""Pump "Big" One""", new DateOnly(2026, 7, 8));
 
-        var (recent, older) = InspectionCatalog.SplitByRecency(dates, Today, d => d);
+        var afterFilename = header[(header.IndexOf("filename=\"", StringComparison.Ordinal) + 10)..];
+        var quoted = afterFilename[..afterFilename.IndexOf('"')];
 
-        Assert.Single(recent);
-        Assert.Empty(older);
-    }
-
-    [Fact]
-    public void One_day_past_six_months_counts_as_older()
-    {
-        DateOnly[] dates = [Today.AddMonths(-6).AddDays(-1)];
-
-        var (recent, older) = InspectionCatalog.SplitByRecency(dates, Today, d => d);
-
-        // With only one record and a minimum-recent of 3, it still gets promoted.
-        Assert.Single(recent);
-        Assert.Empty(older);
-    }
-
-    [Fact]
-    public void Minimum_recent_does_not_promote_more_than_exists()
-    {
-        DateOnly[] dates = [Today.AddMonths(-8), Today.AddMonths(-9)];
-
-        var (recent, older) = InspectionCatalog.SplitByRecency(dates, Today, d => d);
-
-        Assert.Equal(2, recent.Count);
-        Assert.Empty(older);
+        Assert.Contains("Pump 'Big' One", quoted);
     }
 }

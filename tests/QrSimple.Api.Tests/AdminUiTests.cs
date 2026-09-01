@@ -149,15 +149,19 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         }
 
         using var docContent = TestUploads.Document(label: "User manual");
-        await client.PostAsync($"/equipment/{equipment!.Id}/documents", docContent);
+        var docCreated = await client.PostAsync($"/equipment/{equipment!.Id}/documents", docContent);
+        var document = await docCreated.Content.ReadFromJsonAsync<DocumentResponse>();
 
         var response = await client.GetAsync($"/app/equipment/{equipment.Id}");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Contains("Photo", body);
         Assert.Contains($"/documents/{photo.Id}/content", body);
-        Assert.Contains("User manual", body);
-        Assert.Contains("Add document", body);
+        Assert.Contains("User Manual", body);
+        // Not just the "User manual" text: that is also the upload field's label since the
+        // section was renamed from "Documents", so only the row's own link proves it rendered.
+        Assert.Contains($"/documents/{document!.Id}/content", body);
+        Assert.Contains("Add user manual", body);
     }
 
     [Fact]
@@ -174,14 +178,16 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var equipment = await created.Content.ReadFromJsonAsync<EquipmentResponse>();
 
         using var docContent = TestUploads.Document(label: "User manual");
-        await adminClient.PostAsync($"/equipment/{equipment!.Id}/documents", docContent);
+        var docCreated = await adminClient.PostAsync($"/equipment/{equipment!.Id}/documents", docContent);
+        var document = await docCreated.Content.ReadFromJsonAsync<DocumentResponse>();
 
         var readerClient = factory.CreateClientAs("Reader");
         var response = await readerClient.GetAsync($"/app/equipment/{equipment.Id}");
         var body = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("User manual", body);
-        Assert.DoesNotContain("Add document", body);
+        Assert.Contains("User Manual", body);
+        Assert.Contains($"/documents/{document!.Id}/content", body);
+        Assert.DoesNotContain("Add user manual", body);
         Assert.DoesNotContain("type=\"file\"", body);
     }
 
@@ -255,4 +261,6 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     private sealed record EquipmentResponse(Guid Id);
+
+    private sealed record DocumentResponse(Guid Id);
 }

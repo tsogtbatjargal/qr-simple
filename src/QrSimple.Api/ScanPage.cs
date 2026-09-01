@@ -89,6 +89,11 @@ public static class ScanPage
                 """
             : "";
 
+        // "documents" here is a genuine collective — this nav holds the user manual and anything
+        // filed beside it, *plus* the OEM QA/QC report and the rebuild-history link. So it keeps
+        // that wording even though the admin page's matching section was renamed to "User Manual"
+        // on 2026-08-31: narrowing the aria-label or the empty state to "user manual" would claim
+        // no manual exists when what is actually missing is all three. Don't "fix" this to match.
         var documentsSection = documentLinks.Length > 0 || rebuildsPanel.Length > 0 || oemReportPanel.Length > 0
             ? $"""<nav class="documents" aria-label="Equipment documents">{documentLinks}{oemReportPanel}{rebuildsPanel}</nav>"""
             : """<p class="empty-documents">No documents are available for this equipment.</p>""";

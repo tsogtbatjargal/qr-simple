@@ -149,10 +149,10 @@ else
         }
     </div>
 
-    <h2><Icon Name="file-text" />Documents</h2>
+    <h2><Icon Name="file-text" />User Manual</h2>
     @if (OtherDocuments.Count == 0)
     {
-        <p>No documents yet.</p>
+        <p>No user manual yet.</p>
     }
     else
     {
@@ -189,13 +189,13 @@ else
     {
         <div class="form-card">
             <div>
-                <label>Document file <InputFile @key="DocumentInputKey" OnChange="OnDocumentFileSelected" accept=".pdf,.doc,.docx,.xls,.xlsx" /></label>
+                <label>User manual <InputFile @key="DocumentInputKey" OnChange="OnDocumentFileSelected" accept=".pdf,.doc,.docx,.xls,.xlsx" /></label>
                 @if (DocumentFileError is not null)
                 {
                     <p class="validation-message">@DocumentFileError</p>
                 }
             </div>
-            <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedDocumentBytes is null)" @onclick="AddDocumentAsync"><Icon Name="upload" />@(IsBusy ? "Adding..." : "Add document")</button>
+            <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedDocumentBytes is null)" @onclick="AddDocumentAsync"><Icon Name="upload" />@(IsBusy ? "Adding..." : "Add user manual")</button>
         </div>
     }
 
@@ -254,10 +254,10 @@ else
                     OnConfirmed="RetireAsync" />
 
     <ConfirmDialog @ref="DeleteDocConfirm"
-                    Title="@(PendingDelete is null ? "Delete this document?"
+                    Title="@(PendingDelete is null ? "Delete this user manual?"
                              : Photo?.Id == PendingDelete.Id ? "Remove this photo?"
                              : OemReport?.Id == PendingDelete.Id ? "Remove this OEM QA/QC report?"
-                             : "Delete this document?")"
+                             : "Delete this user manual?")"
                     Message="@($"\"{PendingDelete?.Label}\" will be permanently removed.")"
                     ConfirmText="Delete"
                     OnConfirmed="DeleteDocumentAsync" />
@@ -286,7 +286,7 @@ else
     private Document? OemReport;
 
     // The photo and the OEM QA/QC report each own a dedicated section above, so neither may
-    // also appear in the generic Documents table.
+    // also appear in the generic table under the "User Manual" heading.
     private List<Document> OtherDocuments =>
         (Documents ?? []).Where(d => d.Id != Photo?.Id && d.Id != OemReport?.Id).ToList();
     private bool ShowPhotoForm;
@@ -527,14 +527,14 @@ else
                     SelectedDocumentContentType = null;
                     SelectedDocumentFileName = null;
                     DocumentInputKey = Guid.NewGuid();
-                    Toast.Success("Document added.");
+                    Toast.Success("User manual added.");
                     break;
                 case DocumentResult.InvalidFile invalid:
                     Error = invalid.Reason;
                     Toast.Error(Error);
                     break;
                 default:
-                    Error = "Could not add document.";
+                    Error = "Could not add user manual.";
                     Toast.Error(Error);
                     break;
             }

@@ -89,7 +89,7 @@ public static class DocumentCatalog
     // AddUploadAsync/the public POST endpoint don't enforce this, since they're the generic "add
     // a document" path — so callers that want the single-slot guarantee must go through those
     // two methods. EquipmentDetail.razor's admin UI blocks a user from creating a duplicate
-    // photo or OEM report through the generic "Add user manual" form via IsReservedLabel, but
+    // photo or OEM report through the generic "Add manual" form via IsReservedLabel, but
     // nothing at this layer (or the DB) stops another caller (import, seed script, another
     // endpoint) from inserting a second reserved-label row via AddUploadAsync if it doesn't
     // check first.
@@ -110,7 +110,7 @@ public static class DocumentCatalog
         OemReportLabel.Equals(label, StringComparison.OrdinalIgnoreCase);
 
     // Labels that own a dedicated slot in the UI and must never appear in the generic list
-    // under the "User Manual" heading beside manuals and safety data sheets.
+    // under the "Manuals" heading, beside maintenance manuals and safety data sheets.
     public static bool IsReservedLabel(string label) => IsPhotoLabel(label) || IsOemReportLabel(label);
 
     public static async Task<DocumentResult> AddUploadAsync(

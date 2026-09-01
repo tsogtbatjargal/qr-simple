@@ -157,11 +157,12 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Contains("Photo", body);
         Assert.Contains($"/documents/{photo.Id}/content", body);
-        Assert.Contains("User Manual", body);
-        // Not just the "User manual" text: that is also the upload field's label since the
-        // section was renamed from "Documents", so only the row's own link proves it rendered.
+        Assert.Contains("Manuals", body);
+        // Not the row's "User manual" label text: that string is this test's own upload label
+        // (and remains valid Document data after the 2026-09-01 section rename to "Manuals"),
+        // so matching it would pass even if the row never rendered. Pin the row's own link.
         Assert.Contains($"/documents/{document!.Id}/content", body);
-        Assert.Contains("Add user manual", body);
+        Assert.Contains("Add manual", body);
     }
 
     [Fact]
@@ -185,9 +186,9 @@ public class AdminUiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var response = await readerClient.GetAsync($"/app/equipment/{equipment.Id}");
         var body = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("User Manual", body);
+        Assert.Contains("Manuals", body);
         Assert.Contains($"/documents/{document!.Id}/content", body);
-        Assert.DoesNotContain("Add user manual", body);
+        Assert.DoesNotContain("Add manual", body);
         Assert.DoesNotContain("type=\"file\"", body);
     }
 

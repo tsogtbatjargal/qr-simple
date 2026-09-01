@@ -95,7 +95,11 @@ else
 
     @* A <dl> row, not a "Status: x" sentence: this sits directly under the Category/Serial
        number/Site list in the read-only view, and as a <p> its value started at the left margin
-       while theirs started after the label column. Same grid, same --label-col, so they line up. *@
+       while theirs started after the label column.
+       This comment used to claim the shared --label-col was enough to line them up. It isn't, and
+       wasn't: for Admin and Operator the block above this is a form inside .form-card, which insets
+       its content, so the shared column still left this row 25px to the left of the inputs. The
+       matching inset lives on the dl rule in app.css — read that before changing either. *@
     <dl class="meta-line">
         <dt>Status</dt>
         <dd>@Item.Status</dd>
@@ -103,7 +107,10 @@ else
 
     @if (CanChangeStatus)
     {
-        <div class="button-row">
+        @* Right-aligned (see .button-row-end in app.css): Retire otherwise sits two rows
+           straight below the edit form's Save button, in the same column, so a mis-aimed
+           click on Save lands on a destructive action. *@
+        <div class="button-row button-row-end">
             @if (Item.Status == EquipmentStatus.Active)
             {
                 <button class="btn btn-danger" disabled="@IsBusy" @onclick="() => RetireConfirm!.Show()"><Icon Name="x-circle" />Retire</button>
@@ -155,10 +162,10 @@ else
         }
     </div>
 
-    <h2><Icon Name="file-text" />User Manual</h2>
+    <h2><Icon Name="file-text" />Manuals</h2>
     @if (OtherDocuments.Count == 0)
     {
-        <p>No user manual yet.</p>
+        <p>No manuals yet.</p>
     }
     else
     {
@@ -195,13 +202,13 @@ else
     {
         <div class="form-card">
             <div>
-                <label>User manual <InputFile @key="DocumentInputKey" OnChange="OnDocumentFileSelected" accept=".pdf,.doc,.docx,.xls,.xlsx" /></label>
+                <label>Manual file <InputFile @key="DocumentInputKey" OnChange="OnDocumentFileSelected" accept=".pdf,.doc,.docx,.xls,.xlsx" /></label>
                 @if (DocumentFileError is not null)
                 {
                     <p class="validation-message">@DocumentFileError</p>
                 }
             </div>
-            <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedDocumentBytes is null)" @onclick="AddDocumentAsync"><Icon Name="upload" />@(IsBusy ? "Adding..." : "Add user manual")</button>
+            <button type="button" class="btn btn-primary" disabled="@(IsBusy || SelectedDocumentBytes is null)" @onclick="AddDocumentAsync"><Icon Name="upload" />@(IsBusy ? "Adding..." : "Add manual")</button>
         </div>
     }
 
@@ -260,10 +267,10 @@ else
                     OnConfirmed="RetireAsync" />
 
     <ConfirmDialog @ref="DeleteDocConfirm"
-                    Title="@(PendingDelete is null ? "Delete this user manual?"
+                    Title="@(PendingDelete is null ? "Delete this manual?"
                              : Photo?.Id == PendingDelete.Id ? "Remove this photo?"
                              : OemReport?.Id == PendingDelete.Id ? "Remove this OEM QA/QC report?"
-                             : "Delete this user manual?")"
+                             : "Delete this manual?")"
                     Message="@($"\"{PendingDelete?.Label}\" will be permanently removed.")"
                     ConfirmText="Delete"
                     OnConfirmed="DeleteDocumentAsync" />
@@ -292,7 +299,7 @@ else
     private Document? OemReport;
 
     // The photo and the OEM QA/QC report each own a dedicated section above, so neither may
-    // also appear in the generic table under the "User Manual" heading.
+    // also appear in the generic table under the "Manuals" heading.
     private List<Document> OtherDocuments =>
         (Documents ?? []).Where(d => d.Id != Photo?.Id && d.Id != OemReport?.Id).ToList();
     private bool ShowPhotoForm;
@@ -533,14 +540,14 @@ else
                     SelectedDocumentContentType = null;
                     SelectedDocumentFileName = null;
                     DocumentInputKey = Guid.NewGuid();
-                    Toast.Success("User manual added.");
+                    Toast.Success("Manual added.");
                     break;
                 case DocumentResult.InvalidFile invalid:
                     Error = invalid.Reason;
                     Toast.Error(Error);
                     break;
                 default:
-                    Error = "Could not add user manual.";
+                    Error = "Could not add manual.";
                     Toast.Error(Error);
                     break;
             }

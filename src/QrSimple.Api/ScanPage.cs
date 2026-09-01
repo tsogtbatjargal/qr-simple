@@ -55,6 +55,12 @@ public static class ScanPage
 
         var documentLinks = string.Concat(documents
             .Where(document => document != photo && document != oemReport)
+            // These two strings are stored Document.Label *data*, not UI copy — they match what
+            // someone typed or what was derived from a filename, and rows carrying them already
+            // exist in the database. Do not sweep them into a UI rename: the admin section that
+            // lists these was "Documents", then "User Manual", and is "Manuals" as of 2026-09-01,
+            // and none of those renames may touch these, or every existing "User manual" row
+            // silently falls to the bottom of the scan page's order with nothing to show why.
             .OrderBy(document => document.Label.Equals("User manual", StringComparison.OrdinalIgnoreCase) ? 0
                 : document.Label.Equals("Maintenance instruction", StringComparison.OrdinalIgnoreCase) ? 1
                 : 2)
@@ -91,9 +97,10 @@ public static class ScanPage
 
         // "documents" here is a genuine collective — this nav holds the user manual and anything
         // filed beside it, *plus* the OEM QA/QC report and the rebuild-history link. So it keeps
-        // that wording even though the admin page's matching section was renamed to "User Manual"
-        // on 2026-08-31: narrowing the aria-label or the empty state to "user manual" would claim
-        // no manual exists when what is actually missing is all three. Don't "fix" this to match.
+        // that wording even though the admin page's matching section is called "Manuals"
+        // (renamed from "Documents" on 2026-08-31, then to "Manuals" on 2026-09-01): narrowing the
+        // aria-label or the empty state to "manuals" would claim no manual exists when what is
+        // actually missing is all three. Don't "fix" this to match.
         var documentsSection = documentLinks.Length > 0 || rebuildsPanel.Length > 0 || oemReportPanel.Length > 0
             ? $"""<nav class="documents" aria-label="Equipment documents">{documentLinks}{oemReportPanel}{rebuildsPanel}</nav>"""
             : """<p class="empty-documents">No documents are available for this equipment.</p>""";

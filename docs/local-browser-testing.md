@@ -180,6 +180,22 @@ Even though a failed `browser_file_upload` call's own error message lists `/work
 
 If you're verifying a client-side timer (e.g. a toast auto-dismissing after N milliseconds) by running a `setTimeout`-based polling loop inside `browser_evaluate` and comparing your loop's own iteration count to the real delay, don't trust it. The disposable-profile Chrome tab driven by this Playwright setup can have its JS timers throttled (backgrounded-tab-style deprioritization) even while nominally "active," so a loop doing `await sleep(200)` ten times does not reliably mean 2000ms actually elapsed — it can silently take much longer in wall-clock time while still reporting the same iteration count. This produced a false "the timer fired 5x too early" alarm once (`ToastHost`'s 3.5s dismiss looked like it fired at ~700ms). The fix was adding real server-side `Console.WriteLine(DateTime.UtcNow)` timestamps around the actual timer (`Task.Delay` runs server-side in Blazor Server, unaffected by browser tab throttling) and reading those from the `dotnet run` log instead of trusting the browser-side loop's own clock. If a client-side timing test looks wrong by a suspiciously large margin, suspect the measurement (browser timer throttling) before the code.
 
+### This setup is Chrome-only — the one `::placeholder` rule written for Firefox is knowingly untested
+
+`scripts/start-chrome-for-playwright.sh` drives Chrome over CDP, and there is no Firefox on the
+host or in the devcontainer. That is fine for everything the admin UI does *except* one rule:
+`::placeholder { color: var(--muted); opacity: .65 }` in `wwwroot/app.css` exists specifically
+because **Firefox** applies a default opacity to `::placeholder` and Chrome does not. Chrome
+passing that check therefore proves nothing about the case the line was written for.
+
+Decision (2026-09-01, the owner's): **skip it.** Do not add a Firefox/geckodriver stack to this
+setup for it, and do not report it as an outstanding test failure on every verification pass —
+it is a deliberate gap, not an oversight. The rule is a one-line defensive default whose worst
+case is a placeholder that reads slightly darker than intended on one browser; the cost of a
+second browser stack in this container is not worth that. If Firefox ever becomes available for
+another reason, checking the computed `opacity`/`color` on a placeholder there is a two-minute
+job — but don't build the environment just to do it.
+
 ## Troubleshooting
 
 ### The running API process isn't visible from this devcontainer's `ps`/`sudo ps`

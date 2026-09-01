@@ -41,6 +41,12 @@
        different x positions, and no two detail pages agreed either. Not a brand token —
        it's a layout measure, so it lives here rather than in tokens.css. */
     --label-col: 132px;
+    /* Gutter between the label column and the value/field beside it. Matches the <dl>
+       column-gap below so a form field and a read-only row start at the same x. */
+    --label-gap: 18px;
+    /* Inner padding of every card. A token because bare <dl> lists outside a card have to
+       indent by exactly this much to line up with fields inside one — see the dl rule. */
+    --card-pad: clamp(16px, 3vw, 24px);
     font-family: var(--brand-font);
 }
 
@@ -256,7 +262,7 @@ th.sortable .sort-arrow { margin-left: 4px; opacity: .7; font-size: .95em; verti
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
-    padding: clamp(16px, 3vw, 24px);
+    padding: var(--card-pad);
     margin-bottom: 20px;
 }
 
@@ -274,7 +280,26 @@ a.open-link .icon { font-size: .95rem; }
 
 form div { margin-bottom: 16px; }
 
-label { display: block; font-weight: 600; color: var(--muted); font-size: .9rem; margin-bottom: 6px; }
+/* The same two-column grid as <dl> above, on the same --label-col, so a form field and a
+   read-only row line up down the page instead of each input starting wherever its label
+   text happened to end ("Name" vs "Serial number" put two inputs ~40px apart). The label
+   text is an anonymous grid item — there is no element around it — which is why this grid
+   sits on <label> itself rather than on the wrapping <div>, and why every label in the app
+   must stay "text, then exactly one control".
+   baseline, not center: it lines the label up with the text *inside* the field for one-line
+   inputs and with the first line of a <textarea>, so the tall rebuild Note doesn't end up
+   with its label floating half-way down the box. .checkbox-label opts out via its own rule
+   (a class, so it wins regardless of order). */
+label {
+    display: grid;
+    grid-template-columns: var(--label-col) 1fr;
+    align-items: baseline;
+    gap: 6px var(--label-gap);
+    font-weight: 600;
+    color: var(--muted);
+    font-size: .9rem;
+    margin-bottom: 6px;
+}
 
 input[type=text], input[type=email], input:not([type=submit]):not([type=checkbox]):not([type=radio]), select, textarea {
     width: 100%;
@@ -301,7 +326,11 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
 /* Watermarks: an example value, greyed and faded so it can never be misread as a value someone
    actually entered. Lighter than --muted on its own, since --muted marks real content (a <dt>
    label, a status note). Firefox applies its own default opacity to ::placeholder, so set it
-   explicitly rather than trusting the colour alone to carry the distinction. */
+   explicitly rather than trusting the colour alone to carry the distinction.
+   Never verified in Firefox, deliberately: the local test setup is Chrome-only and Chrome
+   applies no default opacity, so it exercises everything here except the reason the opacity
+   line exists. Decided 2026-09-01 not to stand up a Firefox stack for it — see
+   docs/local-browser-testing.md. Don't file this as an untested regression each pass. */
 ::placeholder { color: var(--muted); opacity: .65; }
 
 /* Matches the :not() chain's specificity above so this actually wins the cascade instead of
@@ -313,7 +342,16 @@ input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid:focus, s
     box-shadow: var(--brand-danger-ring);
 }
 
-.validation-message { display: block; color: var(--danger); font-size: .85rem; margin-top: 4px; }
+/* Indented into the field column so the message sits under the input it is about, rather
+   than starting at the label's left edge and reading as a comment on the label. */
+.validation-message { display: block; color: var(--danger); font-size: .85rem; margin-top: 4px; margin-left: calc(var(--label-col) + var(--label-gap)); }
+
+/* <ValidationSummary> renders its errors as <li class="validation-message"> inside
+   <ul class="validation-errors"> — the same class the per-field message uses. Without this the
+   summary's bullets inherit the field-column indent on top of the list's own padding and land
+   ~150px in from the card edge, reading as though they belong to some field to their left. The
+   summary is a whole-form message and starts at the form's left edge. */
+.validation-errors .validation-message { margin-left: 0; }
 .validation-errors { color: var(--danger); padding-left: 20px; margin: 0 0 16px; }
 
 .error {
@@ -330,7 +368,23 @@ input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid:focus, s
 }
 .error .icon { font-size: 1.2rem; }
 
-dl { display: grid; grid-template-columns: var(--label-col) 1fr; gap: 10px 18px; margin: 0 0 20px; }
+/* The label column is shared with form <label>s above, but that alone does NOT make the two
+   line up: the forms sit inside .form-card, which insets its content by --card-pad plus a 1px
+   border, while a <dl> sits bare on the page background. On the equipment detail page that put
+   the Status row 25px to the left of the Name/Serial/Site inputs directly above it — the exact
+   mismatch the shared column was meant to remove. Matching the inset here fixes every bare list
+   at once (Status, the Operator view's read-only Serial number, the Reader view's whole list,
+   the user detail page) instead of wrapping each one in a card it doesn't need.
+   A <dl> that really is inside a card must not be indented twice, hence the reset below. */
+dl {
+    display: grid;
+    grid-template-columns: var(--label-col) 1fr;
+    gap: 10px var(--label-gap);
+    margin: 0 0 20px;
+    padding-inline: calc(var(--card-pad) + 1px);
+}
+
+.card dl, .form-card dl, .table-card dl { padding-inline: 0; }
 dt { color: var(--muted); font-weight: 600; }
 dd { margin: 0; overflow-wrap: anywhere; }
 
@@ -375,6 +429,13 @@ h2 {
 h2 .icon { font-size: 1.15rem; color: var(--blue); }
 
 .button-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 20px; }
+
+/* Pushes a row's buttons to the far right. Used for the Retire/Reactivate control, which
+   sits a short way below the edit form's Save button: same column, a couple of rows apart,
+   which is a straight-down mis-click from Save onto a destructive action. Right-aligning
+   puts the two diagonally opposite instead. Both states are aligned the same way, so the
+   control doesn't jump across the page when the status flips. */
+.button-row-end { justify-content: flex-end; }
 
 .not-authorized-card, .not-found-card {
     max-width: 480px;
@@ -536,6 +597,12 @@ h2 .icon { font-size: 1.15rem; color: var(--blue); }
     main.content { padding: 14px; }
     dl { grid-template-columns: 1fr; }
     dd + dt { margin-top: 8px; }
+    /* Forms stack the same way lists do: a 132px label column plus a usable field does not
+       fit a phone, and the alignment it buys is worth nothing when every row is one column
+       wide anyway. The validation message loses its indent with the column it was indented
+       into. */
+    label { grid-template-columns: 1fr; }
+    .validation-message { margin-left: 0; }
     th, td { padding: 10px 12px; font-size: .9rem; }
     .not-authorized-card, .not-found-card { margin: 24px auto; }
     .login-page { padding: 16px; }

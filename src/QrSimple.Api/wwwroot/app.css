@@ -2,7 +2,13 @@
   Admin UI stylesheet. The palette, typeface, radius and shadow values all come
   from brand/tokens.css (linked ahead of this file in App.razor) — the short
   aliases below exist so rules stay readable, but they must always resolve to a
-  var(--brand-*) token rather than a literal hex value. The public scan page
+  var(--brand-*) token rather than a literal hex value. That holds for translucent
+  colours too — focus rings, the modal scrim, white-on-blue button fills are all
+  tokens (--brand-focus-ring, --brand-scrim, --brand-on-dark-*), because a channel
+  list written out at the call site is a brand colour in a form no rebrand can find:
+  it survives the palette change and quietly keeps the old blue. This file should
+  contain no colour function or hex triplet at all, comments included, so that
+  scanning for one is a whole-file grep and not a judgement call. The public scan page
   (ScanPage.cs) links the same token file; a new colour introduced here has to
   be carried there too, and vice versa.
 */
@@ -29,6 +35,12 @@
     --shadow: var(--brand-shadow);
     --shadow-md: var(--brand-shadow-md);
     --shadow-lg: var(--brand-shadow-lg);
+    /* Width of the label column in every <dl> label/value list. Fixed, not max-content:
+       max-content sizes each list to its own longest label, so the same page's "Status"
+       row and the Category/Serial number/Site block above it started their values at two
+       different x positions, and no two detail pages agreed either. Not a brand token —
+       it's a layout measure, so it lives here rather than in tokens.css. */
+    --label-col: 132px;
     font-family: var(--brand-font);
 }
 
@@ -172,8 +184,8 @@ a:hover { color: var(--blue-dark); }
 .btn-primary { background: var(--blue); color: white; box-shadow: var(--shadow-md); }
 .btn-primary:hover { background: var(--blue-dark); transform: translateY(-1px); color: white; }
 
-.btn-ghost { background: rgb(255 255 255 / 15%); color: white; border: 1px solid rgb(255 255 255 / 40%); }
-.btn-ghost:hover { background: rgb(255 255 255 / 25%); }
+.btn-ghost { background: var(--brand-on-dark-fill); color: white; border: 1px solid var(--brand-on-dark-border); }
+.btn-ghost:hover { background: var(--brand-on-dark-fill-hover); }
 
 .btn-ghost-light { background: white; color: var(--muted); border: 1.5px solid var(--border); }
 .btn-ghost-light:hover { background: var(--tint); color: var(--text); border-color: var(--border-strong); }
@@ -264,7 +276,7 @@ form div { margin-bottom: 16px; }
 
 label { display: block; font-weight: 600; color: var(--muted); font-size: .9rem; margin-bottom: 6px; }
 
-input[type=text], input[type=email], input:not([type=submit]):not([type=checkbox]):not([type=radio]), select {
+input[type=text], input[type=email], input:not([type=submit]):not([type=checkbox]):not([type=radio]), select, textarea {
     width: 100%;
     max-width: 420px;
     padding: 10px 12px;
@@ -276,11 +288,21 @@ input[type=text], input[type=email], input:not([type=submit]):not([type=checkbox
     color: var(--text);
 }
 
-input:focus, select:focus {
+input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--blue);
-    box-shadow: 0 0 0 3px rgb(21 111 193 / 15%);
+    box-shadow: var(--brand-focus-ring);
 }
+
+/* The rebuild Note is the app's only <textarea>; it inherits the field rule above, and needs
+   only a starting height and a sane resize axis on top of it. */
+textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
+
+/* Watermarks: an example value, greyed and faded so it can never be misread as a value someone
+   actually entered. Lighter than --muted on its own, since --muted marks real content (a <dt>
+   label, a status note). Firefox applies its own default opacity to ::placeholder, so set it
+   explicitly rather than trusting the colour alone to carry the distinction. */
+::placeholder { color: var(--muted); opacity: .65; }
 
 /* Matches the :not() chain's specificity above so this actually wins the cascade instead of
    silently losing to the base border-color despite the .invalid class being present. */
@@ -288,7 +310,7 @@ input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid, select.
     border-color: var(--danger);
 }
 input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid:focus, select.invalid:focus {
-    box-shadow: 0 0 0 3px rgb(180 35 24 / 15%);
+    box-shadow: var(--brand-danger-ring);
 }
 
 .validation-message { display: block; color: var(--danger); font-size: .85rem; margin-top: 4px; }
@@ -308,7 +330,7 @@ input:not([type=submit]):not([type=checkbox]):not([type=radio]).invalid:focus, s
 }
 .error .icon { font-size: 1.2rem; }
 
-dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 18px; margin: 0 0 20px; }
+dl { display: grid; grid-template-columns: var(--label-col) 1fr; gap: 10px 18px; margin: 0 0 20px; }
 dt { color: var(--muted); font-weight: 600; }
 dd { margin: 0; overflow-wrap: anywhere; }
 
@@ -323,6 +345,11 @@ dd { margin: 0; overflow-wrap: anywhere; }
 }
 
 .status-line { color: var(--muted); font-weight: 600; margin: 0 0 16px; }
+
+/* A single label/value row that continues whatever list precedes it (Status under the
+   Category/Serial number/Site block), so it needs a tighter bottom margin than a standalone
+   list. It inherits the <dl> grid above, which is the whole point — same label column. */
+.meta-line { margin-bottom: 16px; }
 
 .equipment-photo-preview {
     display: block;
@@ -377,7 +404,7 @@ h2 .icon { font-size: 1.15rem; color: var(--blue); }
 .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgb(20 33 61 / 45%);
+    background: var(--brand-scrim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -389,7 +416,7 @@ h2 .icon { font-size: 1.15rem; color: var(--blue); }
 .modal-card {
     background: var(--surface);
     border-radius: var(--radius);
-    box-shadow: 0 20px 48px rgb(20 33 61 / 30%);
+    box-shadow: var(--brand-shadow-modal);
     padding: clamp(20px, 4vw, 28px);
     width: min(100%, 420px);
     animation: modal-in .15s ease;
@@ -428,7 +455,7 @@ h2 .icon { font-size: 1.15rem; color: var(--blue); }
     font-size: .9rem;
     padding: 12px 20px;
     border-radius: var(--radius-sm);
-    box-shadow: 0 10px 28px rgb(20 33 61 / 25%);
+    box-shadow: var(--brand-shadow-toast);
     animation: toast-in .2s ease;
 }
 

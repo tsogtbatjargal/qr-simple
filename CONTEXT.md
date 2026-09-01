@@ -14,6 +14,7 @@ _Avoid_: Token, tag ID (the QR *is* the pointer, not a one-time credential)
 
 **Document**:
 A labeled file (e.g. "User Manual", "Safety Data Sheet", or the equipment photo) attached to a piece of Equipment for the "more details" flow. Uploaded directly and stored as bytes in Postgres — v1 hosts the file itself rather than linking out to wherever it already lives. The data model keeps room for a URL-based link mode alongside the upload fields for a possible future phase, but nothing in the app creates a URL-based Document today.
+_Note_: **"Document" is the entity name, not what the admin UI calls it.** As of 2026-08-31 the generic list on `/app/equipment/{id}` is headed **"User Manual"** (and its upload control reads "User manual" / "Add user manual"). That was a copy rename only — the entity, the `Documents` table, `DocumentCatalog` and the `/equipment/{id}/documents` routes all keep the `Document` name, because the equipment photo and the OEM QA/QC report are stored as `Document` rows too and "user manual" would be wrong for them. The list still holds more than one file, so a Safety Data Sheet filed there appears under the "User Manual" heading.
 _Avoid_: External link, hosted-elsewhere (v1 stores the bytes, it doesn't point elsewhere)
 
 **Rebuild**:
@@ -22,7 +23,7 @@ _Was_: Inspection. This entity shipped as a periodic-inspection record (weekly/m
 _Avoid_: Audit, audit trail (this codebase uses "audit/change history" to mean a general, cross-entity history feature that is an explicit v1 non-goal — see AGENTS.md's Status section. A Rebuild's provenance fields are a narrow, deliberate exception scoped to this one record type, not a step toward general auditing.), Overhaul, service record
 
 **OEM QA/QC report**:
-The manufacturer's quality-assurance document for a piece of Equipment. Exactly one per Equipment, PDF only. Stored as a `Document` under the reserved label `"OEM QA/QC Report"` rather than as its own entity — it is durable reference material like a manual, and the only thing that sets it apart is the one-per-Equipment rule, which `DocumentCatalog.SetOemReportUploadAsync` enforces by overwriting in place. Gets its own section in the admin UI and its own panel on the scan page, so it is filtered out of the generic Documents list on both (`DocumentCatalog.IsReservedLabel`) — the equipment photo works the same way.
+The manufacturer's quality-assurance document for a piece of Equipment. Exactly one per Equipment, PDF only. Stored as a `Document` under the reserved label `"OEM QA/QC Report"` rather than as its own entity — it is durable reference material like a manual, and the only thing that sets it apart is the one-per-Equipment rule, which `DocumentCatalog.SetOemReportUploadAsync` enforces by overwriting in place. Gets its own section in the admin UI and its own panel on the scan page, so it is filtered out of the generic document list on both (`DocumentCatalog.IsReservedLabel`) — the equipment photo works the same way. (That generic list is the one headed "User Manual" in the admin UI; see the _Note_ under **Document** above.)
 _Avoid_: Certificate, compliance doc (this is the OEM's own QA/QC report, not a certification the operator holds)
 
 **Organization**:

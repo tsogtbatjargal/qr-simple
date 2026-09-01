@@ -20,7 +20,7 @@ else
                 <ValidationSummary />
 
                 <div>
-                    <label>Name <InputText @bind-Value="Model.Name" /></label>
+                    <label>Name <InputText @bind-Value="Model.Name" placeholder="e.g. Dewatering Pump P-08" /></label>
                     <ValidationMessage For="() => Model.Name" />
                 </div>
                 <div>
@@ -36,11 +36,11 @@ else
                     <ValidationMessage For="() => Model.Category" />
                 </div>
                 <div>
-                    <label>Serial number <InputText @bind-Value="Model.SerialNumber" /></label>
+                    <label>Serial number <InputText @bind-Value="Model.SerialNumber" placeholder="e.g. EX-0001" /></label>
                     <ValidationMessage For="() => Model.SerialNumber" />
                 </div>
                 <div>
-                    <label>Site <InputText @bind-Value="Model.Site" /></label>
+                    <label>Site <InputText @bind-Value="Model.Site" placeholder="e.g. North Pit" /></label>
                     <ValidationMessage For="() => Model.Site" />
                 </div>
 
@@ -73,7 +73,7 @@ else
                     <ValidationMessage For="() => Model.Category" />
                 </div>
                 <div>
-                    <label>Site <InputText @bind-Value="Model.Site" /></label>
+                    <label>Site <InputText @bind-Value="Model.Site" placeholder="e.g. North Pit" /></label>
                     <ValidationMessage For="() => Model.Site" />
                 </div>
 
@@ -93,7 +93,13 @@ else
         </dl>
     }
 
-    <p class="status-line">Status: @Item.Status</p>
+    @* A <dl> row, not a "Status: x" sentence: this sits directly under the Category/Serial
+       number/Site list in the read-only view, and as a <p> its value started at the left margin
+       while theirs started after the label column. Same grid, same --label-col, so they line up. *@
+    <dl class="meta-line">
+        <dt>Status</dt>
+        <dd>@Item.Status</dd>
+    </dl>
 
     @if (CanChangeStatus)
     {

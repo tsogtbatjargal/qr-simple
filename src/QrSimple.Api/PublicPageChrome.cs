@@ -9,6 +9,12 @@ public static class PublicPageChrome
 {
     // `title` must already be HTML-encoded by the caller (see ScanPage/RebuildsPage's local
     // Encode helper) — this class doesn't know the source value well enough to encode it itself.
+    //
+    // The theme-color hex below is the only literal brand colour left in the codebase, and it
+    // is unavoidable: a <meta> content attribute is not CSS, so var(--brand-primary) would be
+    // taken as the literal string. Keep it equal to --brand-primary in wwwroot/brand/tokens.css
+    // by hand — a rebrand that misses it leaves the phone's browser chrome around the scan page
+    // on the old colour while the page inside it changes.
     public static string HeadTags(string title) => $"""
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">

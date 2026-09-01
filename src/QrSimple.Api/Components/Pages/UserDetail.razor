@@ -11,7 +11,10 @@ else
     <Breadcrumbs Items="@(new() { new("Users", "/app/users"), new(Item.Email) })" />
 
     <h1>@Item.Email</h1>
-    <p class="status-line">Status: @(Item.IsActive ? "Active" : "Inactive")</p>
+    <dl class="meta-line">
+        <dt>Status</dt>
+        <dd>@(Item.IsActive ? "Active" : "Inactive")</dd>
+    </dl>
 
     <div class="form-card">
         <EditForm Model="Model" OnValidSubmit="SaveRoleAsync">

@@ -106,6 +106,42 @@
   --brand-shadow-md: 0 6px 18px rgb(21 111 193 / 15%);
   --brand-shadow-lg: 0 18px 44px rgb(14 42 71 / 12%);
 
+  /* Component colours composed from the palette above. They live here, not in each
+     consuming app's stylesheet, because that is the only way a palette change is
+     actually one edit: an app that re-types rgb(21 111 193 / 15%) for its focus ring
+     keeps the old blue after a rebrand and nobody notices until someone compares
+     screenshots. If you need a translucent brand colour and there is no token for it,
+     add one here rather than inlining the components at the call site.
+
+     The rgb() component lists below duplicate the hex values above deliberately: a hex
+     custom property cannot be decomposed into channels in a way that works without
+     relative-colour syntax, which is newer than the oldest on-site browsers this kit
+     targets. Change a hex and change its companion list in the same edit. */
+  --brand-primary-rgb: 21 111 193;  /* --brand-primary  #156fc1 */
+  --brand-danger-rgb: 180 35 24;    /* --brand-danger   #b42318 */
+  --brand-text-rgb: 20 33 61;       /* --brand-text     #14213d */
+
+  /* Focus/validation rings. Full box-shadow values, not bare colours, so every field
+     in every app gets the same 3px ring rather than each one picking its own spread. */
+  --brand-focus-ring: 0 0 0 3px rgb(var(--brand-primary-rgb) / 15%);
+  --brand-danger-ring: 0 0 0 3px rgb(var(--brand-danger-rgb) / 15%);
+
+  /* Overlay surfaces. Note these are built on --brand-text (#14213d), not --brand-navy
+     (#0e2a47) like --brand-shadow* above — two different near-blacks, inherited from
+     the pre-rebrand CSS. Kept as-is rather than unified, since changing them shifts the
+     look of every modal and toast; unify deliberately, not as a side effect. */
+  --brand-scrim: rgb(var(--brand-text-rgb) / 45%);
+  --brand-shadow-modal: 0 20px 48px rgb(var(--brand-text-rgb) / 30%);
+  --brand-shadow-toast: 0 10px 28px rgb(var(--brand-text-rgb) / 25%);
+
+  /* White at low alpha, for controls sitting on a brand-coloured header. White is not
+     a palette colour and survives a rebrand unchanged — these are tokens so that "no
+     literal colour outside this file" stays a rule you can check with grep, rather than
+     one with a remembered exception. */
+  --brand-on-dark-fill: rgb(255 255 255 / 15%);
+  --brand-on-dark-fill-hover: rgb(255 255 255 / 25%);
+  --brand-on-dark-border: rgb(255 255 255 / 40%);
+
   /* Type */
   --brand-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }

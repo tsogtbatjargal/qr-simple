@@ -26,22 +26,19 @@ public static class PublicPageChrome
         </header>
         """;
 
+    // The header centres its logo and product name at every width, matching the admin header
+    // in app.css — both used to hug the left edge above 600px and only centre on phones, which
+    // made one product look like two different layouts depending on the device.
     public const string BaseStyles = """
         :root { color-scheme: light; font-family: var(--brand-font); }
         * { box-sizing: border-box; }
         body { margin: 0; background: var(--brand-bg); color: var(--brand-text); }
         .icon { width: 1em; height: 1em; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .site-header { display: flex; align-items: center; gap: 12px; padding: 12px clamp(12px, 3vw, 24px); background: var(--brand-surface); border-bottom: 1px solid var(--brand-border); box-shadow: var(--brand-shadow-sm); }
+        .site-header { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px clamp(12px, 3vw, 24px); background: var(--brand-surface); border-bottom: 1px solid var(--brand-border); box-shadow: var(--brand-shadow-sm); }
         .site-header img { height: 30px; width: auto; display: block; }
         .site-header .product { font-weight: 700; font-size: .95rem; color: var(--brand-navy); letter-spacing: -0.01em; }
         main { width: min(100%, 760px); min-height: 100vh; margin: 0 auto; padding: clamp(12px, 3vw, 24px); }
         .panel { min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 20px; border: 0; border-radius: 14px; background: var(--brand-primary); color: white; text-align: center; box-shadow: var(--brand-shadow-md); }
-        /* Phone and tablet-portrait widths have no second column competing for the row, so
-           the logo and product name sit centred instead of hugging the left edge. Desktop
-           keeps them left-aligned, matching the admin header in app.css. */
-        @media (max-width: 600px) {
-            .site-header { justify-content: center; }
-        }
         @media (max-width: 480px) {
             main { padding: 10px; }
             .panel { min-height: 76px; border-radius: 10px; }

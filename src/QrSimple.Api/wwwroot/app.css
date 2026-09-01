@@ -53,16 +53,21 @@ body { background: var(--bg); color: var(--text); }
     stroke-linejoin: round;
 }
 
+/* A centred column at every width, not only narrow ones: the brand mark and product name
+   sit centred on a desktop monitor exactly as they do on a phone, with the nav row centred
+   beneath them. This replaces an earlier space-between row (brand hard left, nav hard right)
+   that only collapsed to centred below 600px, so the same app looked laid out two different
+   ways depending on the screen. PublicPageChrome.cs's header mirrors this — keep them in step. */
 header.site-header {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    text-align: center;
+    gap: 12px;
     padding: 12px clamp(16px, 4vw, 32px);
     background: var(--blue);
     color: white;
     box-shadow: var(--shadow-md);
-    flex-wrap: wrap;
 }
 
 header.site-header a.brand {
@@ -96,6 +101,7 @@ header.site-header a.brand:hover .brand-name { text-decoration: underline; }
 header.site-header nav.nav-links {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 16px;
     flex-wrap: wrap;
 }
@@ -496,10 +502,8 @@ h2 .icon { font-size: 1.15rem; color: var(--blue); }
 }
 
 @media (max-width: 600px) {
-    /* Stacked at this width, so centre the brand and the nav row rather than leaving them
-       pinned left. Mirrors the public header rule in PublicPageChrome.cs. */
-    header.site-header { flex-direction: column; align-items: center; text-align: center; }
-    header.site-header nav.nav-links { width: 100%; justify-content: center; }
+    /* The header is already a centred column at every width (see header.site-header above),
+       so all that is left at phone size is trimming the brand down. */
     header.site-header a.brand .brand-logo { height: 30px; }
     header.site-header a.brand .brand-name { font-size: 1.05rem; }
     main.content { padding: 14px; }

@@ -1,3 +1,10 @@
 bin/
 obj/
 .playwright-mcp-output/
+
+# Plaintext secrets never belong here. secrets/user-secrets.json is
+# sops-encrypted and is the exception.
+secrets/*
+!secrets/user-secrets.json
+*.env
+appsettings.*.Local.json

@@ -1,0 +1,21 @@
+# Both recipients can decrypt anything encrypted under these rules.
+#
+#   primary  -- on each machine you use, and in Password Safe.
+#   recovery -- paper and USB only. Never on a laptop. Generated 2026-09-07.
+#
+# Adding a recipient later requires re-encrypting: sops updatekeys <file>
+keys:
+  - &primary  age1lg6m7zpn6hkygv3xssfarsa8ykhahsdfn0pr66gd0xahspqstskqz6jtj2
+  - &recovery age1agstl6qfzny7qakjrtgntyv8f070fseh95av72myf7wqlnfw94aqj9f8ee
+
+creation_rules:
+  - path_regex: \.enc\.(ya?ml|json|env|toml)$
+    key_groups:
+      - age:
+          - *primary
+          - *recovery
+  - path_regex: secrets/.*\.(ya?ml|json|env)$
+    key_groups:
+      - age:
+          - *primary
+          - *recovery
